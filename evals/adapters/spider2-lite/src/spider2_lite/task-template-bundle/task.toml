@@ -2,7 +2,7 @@ schema_version = "1.4"
 
 [task]
 name = "spider2-lite/${name}"
-description = "Spider2-lite bundle ${name}: ${ids} on local SQLite db `${db}` asked as one request, source xlang-ai/Spider2@${commit}"
+description = "${description}, source xlang-ai/Spider2@${commit}"
 keywords = ["spider2-lite", "sql", "data-analysis", "bundle"]
 
 [metadata]

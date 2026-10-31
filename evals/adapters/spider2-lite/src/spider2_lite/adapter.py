@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import shutil
+import sqlite3
 from pathlib import Path
 from string import Template
 
 from . import compare  # gold resolution must match the grader exactly
+from . import olist
 
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "task-template"
@@ -25,6 +27,8 @@ BUNDLES = {
                  "start and end, which paths they take, and how they reach registration and conversion. Answer these "
                  "four questions:",
     },
+    # Spider2 ids mixed with our own questions (olist.Question: text + reference gold); "db" overrides the Spider2 db
+    **olist.BUNDLES,
 }
 EVALS = HERE.parents[3]
 CACHE = EVALS / ".cache" / "spider2"
@@ -84,16 +88,23 @@ def make_task(iid: str, out: Path, cache: Path = CACHE) -> Path:
 def make_bundle(name: str, out: Path, cache: Path = CACHE, bundles: dict = BUNDLES) -> Path:
     if name not in bundles:
         raise SystemExit(f"{name}: unknown bundle (known: {', '.join(bundles)})")
-    ids, intro = bundles[name]["ids"], bundles[name]["intro"]
-    src = [_source(i, cache) for i in ids]
-    dbs = {db for _, _, db, _ in src}
+    items, intro, db_name = bundles[name]["ids"], bundles[name]["intro"], bundles[name].get("db")
+    spider = {i: _source(i, cache) for i in items if isinstance(i, str)}
+    dbs = {db for _, _, db, _ in spider.values()} if not db_name else {cache / "localdb" / f"{db_name}.sqlite"}
     if len(dbs) != 1:
         raise SystemExit(f"{name}: questions must share one db, got {sorted(p.stem for p in dbs)}")
     db = dbs.pop()
+    if not db.exists():
+        raise SystemExit(f"{name}: missing {db} — run fetch.sh first")
+    ids = [i if isinstance(i, str) else i.id for i in items]
     qs = {f"q{n}": iid for n, iid in enumerate(ids, 1)}
+    text = [spider[i][0]["question"].strip() if isinstance(i, str) else i.text for i in items]
+    ours = [i for i in ids if i not in spider]
     vals = {"name": name, "db": db.stem, "intro": intro, "commit": (cache / "COMMIT").read_text().strip(),
             "ids": ", ".join(ids), "ids_json": json.dumps(ids),
-            "questions": "\n".join(f"{n}. {t['question'].strip()}" for n, (t, _, _, _) in enumerate(src, 1)),
+            "description": f"Spider2-lite bundle {name}: {', '.join(ids)} on local SQLite db `{db.stem}` asked as one "
+                           f"request" + (f" ({', '.join(ours)}: ours, gold from adapter olist.py)" if ours else ""),
+            "questions": "\n".join(f"{n}. {t}" for n, t in enumerate(text, 1)),
             "answer_files": ", ".join(f"`/app/answers/{q}.csv`" for q in qs)}
     d = out / name
     _render(BUNDLE_TEMPLATE, d, vals)
@@ -103,11 +114,21 @@ def make_bundle(name: str, out: Path, cache: Path = CACHE, bundles: dict = BUNDL
     (d / "tests" / "bundle.json").write_text(json.dumps({"questions": qs}))
     (d / "tests" / "gold").mkdir()
     (d / "solution" / "answers").mkdir()
-    for q, (iid, (_, std, _, golds)) in zip(qs, zip(ids, src)):
-        (d / "tests" / f"eval_{iid}.json").write_text(json.dumps(std))
-        for g in golds:
-            shutil.copy2(g, d / "tests" / "gold" / g.name)
-        shutil.copy2(golds[0], d / "solution" / "answers" / f"{q}.csv")
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        for q, item in zip(qs, items):
+            if isinstance(item, str):
+                _, std, _, golds = spider[item]
+            else:                                 # our question: gold from its reference code
+                std, golds = item.standard, [d / "tests" / "gold" / f"{item.id}.csv"]
+                item.gold(con).to_csv(golds[0], index=False)
+            (d / "tests" / f"eval_{qs[q]}.json").write_text(json.dumps(std))
+            for g in golds:
+                if g.parent != d / "tests" / "gold":
+                    shutil.copy2(g, d / "tests" / "gold" / g.name)
+            shutil.copy2(golds[0], d / "solution" / "answers" / f"{q}.csv")
+    finally:
+        con.close()
     return d
 
 
