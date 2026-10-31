@@ -8,16 +8,22 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import duckdb
 
 STATE = ".tracebook"
 NB_DIR = "notebooks"
 KEY = re.compile(r"^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$")
+SOURCE_TYPES = {"postgres": "postgres", "mysql": "mysql", "sqlite": "sqlite", "duckdb": None}   # type → extension
+SOURCE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+RESERVED_SOURCES = {"main", "data", "memory", "system", "temp"}   # DuckDB catalogs/schemas a source name would shadow
+SYSTEM_SCHEMAS = ("pg_catalog", "information_schema", "mysql", "performance_schema", "sys")    # not listed
 
 
 class ProjectError(Exception):
@@ -114,6 +120,56 @@ class Project:
     def save_manifest(self, m: dict) -> None:
         self._write_json("import.json", m)
 
+    @property
+    def sources(self) -> dict:
+        """name → {type, env | path}: external databases attached read-only (`tracebook source add`)."""
+        return self._json("sources.json", {})
+
+    def save_sources(self, s: dict) -> None:
+        self._write_json("sources.json", s)
+
+    def attach(self, con, name: str, s: dict) -> None:
+        """ATTACH one source READ_ONLY as catalog `name`. The URL comes from an environment variable and is never
+        stored; file sources may be a path relative to the workspace."""
+        if s.get("env"):
+            target = os.environ.get(s["env"])
+            if not target:
+                raise ProjectError(f"source {name}: environment variable {s['env']} is not set")
+        else:
+            target = str((self.root / s["path"]).resolve())
+        ext = SOURCE_TYPES[s["type"]]
+        if ext:
+            con.execute(f"INSTALL {ext}")              # one-time download; no-op once installed
+            con.execute(f"LOAD {ext}")
+        opts = f"TYPE {ext}, READ_ONLY" if ext else "READ_ONLY"
+        con.execute(f"ATTACH '{target.replace(chr(39), chr(39) * 2)}' AS \"{name}\" ({opts})")
+
+    def attach_sources(self, con) -> dict[str, str]:
+        """Attach every source; → {name: error} for those that failed (messages have secrets redacted)."""
+        failed = {}
+        for name, s in self.sources.items():
+            try:
+                self.attach(con, name, s)
+            except ProjectError as e:
+                failed[name] = str(e)
+            except Exception as e:
+                failed[name] = self.redact(f"{type(e).__name__}: {str(e).splitlines()[0]}")
+        return failed
+
+    def redact(self, text: str, extra: dict | None = None) -> str:
+        """Replace source URLs (and their passwords) from the environment with `$VAR` in messages."""
+        for s in {**self.sources, **(extra or {})}.values():
+            v = os.environ.get(s.get("env") or "")
+            if not v:
+                continue
+            try:
+                pw = urlsplit(v).password if "://" in v else None
+            except ValueError:                         # malformed URL: the whole value is still redacted
+                pw = None
+            for secret in filter(None, (v, pw)):
+                text = text.replace(secret, f"${s['env']}")
+        return text
+
     @contextmanager
     def lock(self):
         """Serialize every DB writer across processes (DuckDB allows one writer)."""
@@ -129,7 +185,9 @@ class Project:
         """schema: a notebook schema to resolve bare names in first (then `main`); created when writable."""
         db = self.dir / "data.duckdb"
         if read_only and not db.exists():
-            raise ProjectError("no data imported yet; run `tracebook import <files>`")
+            if not self.sources:
+                raise ProjectError("no data imported yet; run `tracebook import <files>` or `tracebook source add`")
+            duckdb.connect(str(db)).close()           # sources only: an empty local database to attach them to
         con = duckdb.connect(str(db), read_only=read_only)
         # Session TZ drives date_trunc / ::DATE on TIMESTAMPTZ, so buckets follow the project's local day.
         con.execute(f"SET TimeZone = '{self.config['timezone']}'")

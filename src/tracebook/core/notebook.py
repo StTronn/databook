@@ -39,6 +39,7 @@ class Block:
     title: str | None = None              # ```sql id "Title"
     reads: set[str] = field(default_factory=set)   # imported tables read
     uses: set[str] = field(default_factory=set)    # named outputs of python blocks read (`model__summary`)
+    auto: bool = False                     # id numbered by position (md_3, chart_2), not written by the author
 
 
 @dataclass
@@ -69,7 +70,7 @@ def parse(text: str) -> Notebook:
     def flush():
         nonlocal md
         if "".join(md).strip():
-            blocks.append(Block("md", f"md_{len(blocks) + 1}", "\n".join(md), md_start))
+            blocks.append(Block("md", f"md_{len(blocks) + 1}", "\n".join(md), md_start, auto=True))
         md = []
 
     while i < len(lines):
@@ -81,12 +82,14 @@ def parse(text: str) -> Notebook:
                 diags.append(Diag(start, "UNCLOSED_FENCE", f"```{kind} block is never closed"))
                 break
             flush()
-            if not bid:
+            numbered = not bid
+            if numbered:
                 if kind in COMPUTE:
                     diags.append(Diag(start, "MISSING_ID", f"```{kind} needs an id, e.g. ```{kind} my_block"))
                 auto[kind] = auto.get(kind, 0) + 1
                 bid = f"{kind}_{auto[kind]}"
-            blocks.append(Block(kind, bid, "\n".join(lines[i + 1:end]), start, title=(title or "").strip() or None))
+            blocks.append(Block(kind, bid, "\n".join(lines[i + 1:end]), start, title=(title or "").strip() or None,
+                                auto=numbered))
             i, md_start = end + 1, end + 2
             continue
         if (k := re.match(r"^```([A-Za-z]+)", lines[i])) and k[1] in COMPUTE + DISPLAY:
@@ -127,8 +130,14 @@ def _ref_names(b: Block) -> list[str]:
     return []
 
 
-def resolve(nb: Notebook, tables: set[str]) -> list[Block]:
-    """Fill block.deps; add REF/CYCLE diagnostics; return blocks in execution order (cycles excluded)."""
+def name_parts(name: str) -> list[str]:
+    """`shop.sales."My T"` → ['shop', 'sales', 'My T'] (dots inside quotes are part of the name)."""
+    return [p.strip('"') for p in re.findall(r'"(?:[^"]|"")*"|[^.]+', name)]
+
+
+def resolve(nb: Notebook, tables: set[str], sources: frozenset[str] = frozenset()) -> list[Block]:
+    """Fill block.deps; add REF/CYCLE diagnostics; return blocks in execution order (cycles excluded).
+    `sources`: lower-case names of attached databases; SQL may read `<source>.<schema>.<table>`."""
     ids = {b.id for b in nb.blocks}
     lower = {t.lower(): t for t in tables} | {i.lower(): i for i in ids}
     py = {b.id.lower(): b.id for b in nb.blocks if b.kind == "python"}
@@ -143,14 +152,19 @@ def resolve(nb: Notebook, tables: set[str]) -> list[Block]:
         if b.kind == "sql":
             try:
                 names = list(duckdb.get_table_names(b.body))
-                qualified = [q.split(" AS ")[0] for q in duckdb.get_table_names(b.body, qualified=True)]
+                qualified = [name_parts(q.split(" AS ")[0]) for q in duckdb.get_table_names(b.body, qualified=True)]
             except Exception as e:
                 nb.diags.append(Diag(b.line, "SQL_ERROR", str(e).split("\n")[0], block=b.id))
                 continue
-            if bad := sorted(q for q in qualified if "." in q and q.split(".")[0].strip('"').lower() != "main"):
+            external = [q for q in qualified if len(q) > 1 and q[0].lower() in sources]
+            if bad := sorted(".".join(q) for q in qualified if len(q) > 1 and q not in external and q[0].lower() != "main"):
                 nb.diags.append(Diag(b.line, "CROSS_NOTEBOOK_REF", f"{b.id} reads {', '.join(bad)}; a notebook can "
-                                     "only read imported tables and its own blocks", block=b.id))
+                                     "only read imported tables, its own blocks and sources (`tracebook source list`)",
+                                     block=b.id))
                 continue
+            b.reads |= {".".join(q) for q in external}    # source tables: read through DuckDB, never a block dep
+            local = {q[-1].lower() for q in qualified if q not in external}
+            names = [n for n in names if n.lower() in local]
         elif b.kind == "python":
             try:
                 tree = ast.parse("def __tb__():\n" + "\n".join("    " + ln for ln in b.body.split("\n")))

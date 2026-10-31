@@ -23,6 +23,9 @@ If `tracebook` is not on PATH: `uv tool install <path-to-repo>/tracebook` (or `p
    nothing was loaded for that table: rerun with `--types col=date:dmy` (or the type it names). When a line
    says a source pack matched (e.g. `razorpay.payments`), run `tracebook skill guide <pack>` once and follow it.
 3. `tracebook schema` — learn tables, columns, types. `tracebook query "<sql>"` to explore (read-only).
+   Databases need no import: `tracebook source add shop --type postgres --env SHOP_URL` (mysql/sqlite/duckdb too;
+   the URL stays in the env var), then SQL blocks read `shop.<schema>.<table>` read-only. Filter and aggregate in
+   that SQL block; python blocks read its result, never the source directly.
 4. Edit the notebook file (block syntax below; full reference: `references/blocks.md` next to this file).
 5. `tracebook check` — runs everything. Exit 0 = clean. Fix every `✗` line at the `<file>:<line>` it names,
    rerun until `✓`. `tracebook snapshot` shows each block's status and columns.

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+from tracebook.core import anchors
 from tracebook.project import Project, ProjectError
 
 MAX_TEXT = 4000
@@ -28,37 +29,60 @@ def _save(p: Project, data: dict) -> None:
     tmp.replace(_path(p))
 
 
+def _last_run(p: Project, notebook: str) -> dict:
+    """The notebook's last results doc with anchors set ({"blocks": []} if the notebook or its results are gone)."""
+    rp = p.nb(notebook).results_path if notebook in p.notebooks() else None
+    doc = (json.loads(rp.read_text()) if rp and rp.exists() else None) or {"blocks": []}
+    anchors.assign(doc["blocks"])                  # same function the run used; also covers results from older versions
+    return doc
+
+
+def _find(blocks: list[dict], anchor: str | None, block: str) -> dict | None:
+    """By anchor; comments from before anchors existed carry none and are matched by block id."""
+    return next((b for b in blocks if (b["anchor"] == anchor if anchor else b["id"] == block)), None)
+
+
+def _state(c: dict, blocks: list[dict]) -> dict:
+    """attached | outdated (block found, content changed since the comment; `now` = what it shows today) |
+    orphan (block gone: the agent should resolve with a note). A comment never moves to another block."""
+    b = _find(blocks, c.get("anchor"), c["block"])
+    if b is None:
+        return {"state": "orphan", "orphan": True}
+    changed = bool(c.get("seen")) and anchors.fingerprint(b) != c["seen"]["hash"]
+    return {"block": b["id"], "line": b["line"], "orphan": False, "state": "outdated" if changed else "attached",
+            **({"now": anchors.brief(b)} if changed else {})}
+
+
 def items(p: Project, notebook: str | None = None, include_resolved: bool = False) -> list[dict]:
-    """Comments with their block's CURRENT line (from the notebook's last run); `orphan` = the block or notebook is
-    gone, so the comment can't be acted on where it was left (the agent should resolve it with a note)."""
-    out, lines = [], {}
-    nbs = p.notebooks()
+    """Comments resolved against the notebook's last run: current block id and line, plus `state` (see _state)."""
+    out, runs = [], {}
     for c in _load(p)["items"]:
         if (notebook is not None and c["notebook"] != notebook) or (not include_resolved and c["status"] != "open"):
             continue
-        if c["notebook"] not in lines:
-            rp = p.nb(c["notebook"]).results_path if c["notebook"] in nbs else None
-            doc = json.loads(rp.read_text()) if rp and rp.exists() else {"blocks": []}
-            lines[c["notebook"]] = {b["id"]: b["line"] for b in doc["blocks"]}
-        cur = lines[c["notebook"]].get(c["block"])
-        out.append({**c, "line": cur or c["line"], "orphan": cur is None})
+        if c["notebook"] not in runs:
+            runs[c["notebook"]] = _last_run(p, c["notebook"])["blocks"]
+        out.append({**c, **_state(c, runs[c["notebook"]])})
     return out
 
 
-def add(p: Project, notebook: str, block: str, text: str) -> dict:
-    """Attach a comment to a block of the notebook's last run (the line is taken from that run)."""
+def add(p: Project, notebook: str, block: str, text: str, anchor: str | None = None) -> dict:
+    """Attach a comment to a block of the notebook's last run, by anchor when the viewer sends one (an id can point
+    at a different block once the notebook re-ran), else by id. Stores a snapshot of what the block showed."""
     ref = p.nb(notebook)
     text = str(text).strip()
     if not text or len(text) > MAX_TEXT:
         raise ProjectError(f"comment must be 1–{MAX_TEXT} characters")
-    doc = json.loads(ref.results_path.read_text()) if ref.results_path.exists() else {"blocks": []}
-    b = next((b for b in doc["blocks"] if b["id"] == block), None)
+    doc = _last_run(p, ref.key)
+    b = _find(doc["blocks"], anchor, block)
     if not b:
-        raise ProjectError(f"no block {block!r} in {ref.key} (as of its last run)")
+        raise ProjectError(f"no block {anchor or block!r} in {ref.key} (as of its last run)")
+    seen = {"ranAt": doc.get("ranAt"), "dataHash": doc.get("dataHash"), "hash": anchors.fingerprint(b),
+            "brief": anchors.brief(b)}
     with p.lock():
         data = _load(p)
-        c = {"id": data["next"], "notebook": ref.key, "path": ref.path.relative_to(p.root).as_posix(), "block": block,
-             "line": b["line"], "text": text, "status": "open", "created": _now(), "resolution": None, "resolved": None}
+        c = {"id": data["next"], "notebook": ref.key, "path": ref.path.relative_to(p.root).as_posix(), "block": b["id"],
+             "anchor": b["anchor"], "line": b["line"], "text": text, "status": "open", "created": _now(),
+             "resolution": None, "resolved": None, "seen": seen}
         data["next"] += 1
         data["items"].append(c)
         _save(p, data)

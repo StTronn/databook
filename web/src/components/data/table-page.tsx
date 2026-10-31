@@ -149,7 +149,8 @@ function PreviewTable({ preview }: { preview: Preview }) {
         </Table>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        showing first {count(preview.display.length)} of {plural(preview.rowCount, "row")}
+        showing first {count(preview.display.length)}
+        {preview.rowCount === null ? " rows" : ` of ${plural(preview.rowCount, "row")}`}
       </p>
     </div>
   )
@@ -166,7 +167,7 @@ function Header({ meta }: { meta: SchemaTable }) {
         <CopySql name={meta.name} />
       </div>
       <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-        <span className="tabular-nums">{plural(meta.rows, "row")}</span>
+        <span className="tabular-nums">{meta.rows === null ? "read-only source (rows not counted)" : plural(meta.rows, "row")}</span>
         <span>{plural(meta.columns.length, "column")}</span>
         {meta.files.length ? <span className="break-all">from {meta.files.join(", ")}</span> : null}
       </p>
@@ -214,7 +215,7 @@ export function TablePage({ table, onOpenBlock }: TablePageProps) {
     <div className="flex min-w-0 flex-col gap-5 p-4 md:p-6">
       {schema.error ? <ErrorAlert title={meta ? "Showing last loaded schema" : "Could not load schema"} message={schema.error} /> : null}
       {missing ? (
-        <ErrorAlert title="Unknown table" message={`No imported table named “${table}”.`} />
+        <ErrorAlert title="Unknown table" message={`No imported or source table named “${table}”.`} />
       ) : !meta ? (
         schema.error ? null : <Loading />
       ) : (

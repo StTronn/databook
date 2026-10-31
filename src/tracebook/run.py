@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from tracebook.core import anchors
 from tracebook.core.notebook import COMPUTE, INTERP, REF, Block, Diag, Notebook, parse, resolve
 from tracebook.core.values import FORMATS, as_number, fmt, fmt_cell, to_json
 from tracebook import history
@@ -24,12 +25,14 @@ _LITERAL = re.compile(r"(?<![\w.{])([₹$€£]\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:
 _PII = re.compile(r"(^|_)(email|contact|phone|mobile|vpa|pan|aadhaar|card_number)($|_)")
 
 
-def fingerprint(project: Project, nb_text: str, nb: Notebook) -> dict:
+def fingerprint(project: Project, nb_text: str, nb: Notebook, live: str = "") -> dict:
+    """notebookHash: the notebook + its sheet models. dataHash: imports, time zone, source config and `live` (result
+    hashes of blocks reading sources: a database has no file to hash, so what was read stands in for it)."""
     h = hashlib.sha256(nb_text.encode())
     for b in nb.blocks:
         if b.kind == "sheet" and isinstance(b.spec, dict) and (f := project.root / str(b.spec.get("file", ""))).is_file():
             h.update(f.read_bytes())
-    data = json.dumps(project.manifest, sort_keys=True, default=str) + project.config["timezone"]
+    data = json.dumps([project.manifest, project.sources], sort_keys=True, default=str) + project.config["timezone"] + live
     return {"notebookHash": h.hexdigest(), "dataHash": hashlib.sha256(data.encode()).hexdigest()}
 
 
@@ -45,7 +48,27 @@ def _table_result(con, fq: str) -> dict:
     cols = [(c, t) for c, t, *_ in con.execute(f"DESCRIBE {fq}").fetchall()]
     n = con.execute(f"SELECT count(*) FROM {fq}").fetchone()[0]
     rows = con.execute(f"SELECT * FROM {fq} LIMIT {ROW_CAP}").fetchall()
-    return {"columns": [{"name": c, "type": t} for c, t in cols], "rows": rows, "rowCount": n, "truncated": n > ROW_CAP}
+    # Whole result, independent of row order (count + sum of row hashes): what run diffs compare, not the shown rows.
+    h = con.execute(f"SELECT sum(hash(*COLUMNS(*))::HUGEINT) FROM {fq}").fetchall()[0][0]
+    return {"columns": [{"name": c, "type": t} for c, t in cols], "rows": rows, "rowCount": n, "truncated": n > ROW_CAP,
+            "hash": f"{n}:{h or 0}"}
+
+
+def _top_level(con, sql: str) -> tuple[bool, bool]:
+    """(has ORDER BY, picks rows arbitrarily: LIMIT / DISTINCT ON without ORDER BY) for the query's own top level.
+    A statement DuckDB can't serialize (PIVOT …) counts as ordered if it says ORDER BY anywhere, so an author's
+    order is never overridden."""
+    try:
+        j = json.loads(con.execute("SELECT json_serialize_sql(?)", [sql]).fetchall()[0][0])
+        mods = None if j.get("error") else j["statements"][0]["node"].get("modifiers", [])
+    except Exception:
+        mods = None
+    if mods is None:
+        return bool(re.search(r"\border\s+by\b", sql, re.I)), False
+    ordered = any(m["type"] == "ORDER_MODIFIER" for m in mods)
+    picks = any(m["type"] in ("LIMIT_MODIFIER", "LIMIT_PERCENT_MODIFIER") or
+                (m["type"] == "DISTINCT_MODIFIER" and m.get("distinct_on_targets")) for m in mods)
+    return ordered, picks and not ordered
 
 
 def _load_df(con, fq: str) -> pd.DataFrame:
@@ -98,7 +121,7 @@ def _run_python(con, b: Block, nb_line: int, tz: str, schema: str, taken: set[st
     ns = {"pd": pd, "Decimal": Decimal, "TZ": tz}
     for d in sorted(b.deps):
         ns[d] = _load_df(con, _fq(schema, d))
-    have = {t for (t,) in con.execute("SELECT table_name FROM duckdb_tables() WHERE schema_name = ?", [schema]).fetchall()}
+    have = {t for (t,) in con.execute("SELECT table_name FROM duckdb_tables() WHERE database_name = current_database() AND schema_name = ?", [schema]).fetchall()}
     for u in sorted(b.uses):
         if u not in have:
             raise BlockError("REF_UNKNOWN", f"{u}: block {u.split('__')[0]!r} returned no output named "
@@ -158,7 +181,7 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
     text = ref.path.read_text()
     nb = parse(text)
     tables = set(project.manifest["tables"])
-    order = resolve(nb, tables)
+    order = resolve(nb, tables, frozenset(project.sources))
     for b in nb.blocks:
         b.tables = {t for t in tables if b.kind == "python" and _mentions(b.body, t)}
     results: dict[str, dict] = {}
@@ -171,12 +194,14 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
             # schema, so `main` keeps exactly the imported tables (older versions wrote blocks there).
             ids = {b.id for b in nb.blocks}
             live = {schema_for(k) for k in project.notebooks()}
-            for sch, t in con.execute("SELECT schema_name, table_name FROM duckdb_tables()").fetchall():
+            here = "WHERE database_name = current_database()"     # never an attached source's tables
+            for sch, t in con.execute(f"SELECT schema_name, table_name FROM duckdb_tables() {here}").fetchall():
                 if (sch == "main" and t not in tables) or (sch == ref.schema and t not in ids):
                     con.execute(f"DROP TABLE {_fq(sch, t)}")
-            for (sch,) in con.execute("SELECT schema_name FROM duckdb_schemas() WHERE starts_with(schema_name, 'nb_')").fetchall():
+            for (sch,) in con.execute(f"SELECT schema_name FROM duckdb_schemas() {here} AND starts_with(schema_name, 'nb_')").fetchall():
                 if sch not in live:
                     con.execute(f"DROP SCHEMA {_q(sch)} CASCADE")
+            down = project.attach_sources(con)                   # after cleanup: attached tables are never dropped
             blocked = {d.block for d in nb.diags if d.severity == "error" and d.block}
             for b in order:
                 if b.kind not in COMPUTE:
@@ -190,7 +215,11 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
                                     if b.id not in blocked else "see diagnostics"}
                     continue
                 try:
+                    if gone := sorted({r.split(".")[0] for r in b.reads if "." in r} & down.keys()):
+                        raise BlockError("SOURCE_UNAVAILABLE", "; ".join(down[n] for n in gone))
                     extra = _compute(con, project, ref, b, results, tables | ids)
+                    for code, msg in extra.pop("warnings", []):
+                        nb.diags.append(Diag(b.line, code, msg, "warning", b.id))
                     results[b.id] = _table_result(con, _fq(ref.schema, b.id))
                     for name in extra.get("outputs", []):
                         results[name] = _table_result(con, _fq(ref.schema, name))
@@ -207,6 +236,7 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
     out_blocks = [_render(b, results, status, nb, hints) for b in nb.blocks]
     for o in out_blocks:                                  # reverse deps: which blocks read this one
         o["usedBy"] = [u["id"] for u in out_blocks if o["id"] in u["deps"] and u is not o]
+    anchors.assign(out_blocks)
     for b in nb.blocks:
         if b.kind == "md":
             _check_prose(b, nb)
@@ -214,7 +244,9 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
     doc = {
         "notebook": ref.key,
         "path": ref.path.relative_to(project.root).as_posix(),
-        **fingerprint(project, text, nb),
+        **fingerprint(project, text, nb, json.dumps(
+            {b.id: results[b.id]["hash"] if b.id in results else status.get(b.id, {}).get("error")
+             for b in nb.blocks if any("." in r for r in b.reads)}, sort_keys=True)),
         "ranAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "timezone": project.config["timezone"],
         "title": nb.meta.get("title") or next((ln[2:].strip() for b in nb.blocks if b.kind == "md"
@@ -241,11 +273,22 @@ def _compute(con, project: Project, nbr: NotebookRef, b: Block, results: dict, t
         sql = b.body.strip().rstrip(";").strip()
         if not sql.lower().startswith(_STARTS):
             raise BlockError("SQL_ERROR", "sql blocks must be a single query (SELECT / WITH / FROM …)")
+        ordered, arbitrary = _top_level(con, sql)
+        fq = _fq(nbr.schema, b.id)
+        # Unordered results are stored sorted by every column: parallel scans otherwise return a different order
+        # each run, so shown rows, charts, CSVs and python inputs would change on an identical rerun.
+        # Newlines keep a trailing `-- comment` from swallowing the wrapper.
         try:
-            con.execute(f"CREATE OR REPLACE TABLE {_fq(nbr.schema, b.id)} AS {sql}")
-        except Exception as e:
-            raise BlockError("SQL_ERROR", str(e).replace("\n", " ")[:500]) from None
-        return {}
+            if ordered:
+                raise LookupError
+            con.execute(f"CREATE OR REPLACE TABLE {fq} AS SELECT * FROM (\n{sql}\n) ORDER BY ALL")
+        except Exception:
+            try:                                  # author's order, or a query/type the wrapper can't take
+                con.execute(f"CREATE OR REPLACE TABLE {fq} AS {sql}")
+            except Exception as e:
+                raise BlockError("SQL_ERROR", project.redact(str(e).replace("\n", " "))[:500]) from None
+        return {"warnings": [("UNORDERED_LIMIT", f"{b.id} uses LIMIT / DISTINCT ON without ORDER BY, so which rows "
+                              "it keeps can change between runs; add an ORDER BY")]} if arbitrary else {}
     if b.kind == "python":
         outs = _run_python(con, b, b.line + 1, project.config["timezone"], nbr.schema, taken)
         return {"outputs": outs} if outs else {}
@@ -309,7 +352,8 @@ def _format_hints(nb: Notebook) -> dict[tuple[str, str], str]:
 
 
 def _render(b: Block, results: dict, status: dict, nb: Notebook, hints: dict) -> dict:
-    out = {"id": b.id, "kind": b.kind, "line": b.line, "deps": sorted(b.deps), "reads": sorted(b.reads), "title": b.title}
+    out = {"id": b.id, "kind": b.kind, "line": b.line, "deps": sorted(b.deps), "reads": sorted(b.reads), "title": b.title,
+           **({"auto": True} if b.auto else {})}
 
     def diag(e: BlockError):
         nb.diags.append(Diag(b.line, e.code, str(e), block=b.id))
@@ -322,7 +366,7 @@ def _render(b: Block, results: dict, status: dict, nb: Notebook, hints: dict) ->
             out.update({"columns": r["columns"], "rows": [[to_json(v) for v in row] for row in r["rows"]],
                         "display": [[fmt(v, hints[(b.id, c["name"])]) if (b.id, c["name"]) in hints else fmt_cell(v)
                                      for v, c in zip(row, r["columns"])] for row in r["rows"]],
-                        "rowCount": r["rowCount"], "truncated": r["truncated"]})
+                        "rowCount": r["rowCount"], "truncated": r["truncated"], "rowsHash": r["hash"]})
             pii = [c["name"] for c in r["columns"] if _PII.search(c["name"].lower())]
             if pii:
                 nb.diags.append(Diag(b.line, "PII_COLUMN_PUBLISHED", f"{b.id} output includes personal data columns "

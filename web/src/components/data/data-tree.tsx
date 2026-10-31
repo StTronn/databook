@@ -19,7 +19,7 @@ const label = "text-[10px] tracking-wider text-muted-foreground uppercase"
 
 export function DataTree({ selected, onOpen }: DataTreeProps) {
   const { live } = useLive()
-  const { tables, error } = useSchema()
+  const { tables, sourceErrors, error } = useSchema()
   const [query, setQuery] = useState("")
   const q = useDeferredValue(query)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
@@ -47,6 +47,13 @@ export function DataTree({ selected, onOpen }: DataTreeProps) {
           className="h-8 rounded-none pl-7 text-xs md:text-xs"
         />
       </div>
+      {Object.entries(sourceErrors).map(([name, msg]) => (
+        <Alert key={name} variant="destructive" className="rounded-none px-3 py-2">
+          <AlertDescription className="text-xs break-all">
+            source {name} unavailable: {msg}
+          </AlertDescription>
+        </Alert>
+      ))}
       {error && !tables ? (
         <Alert variant="destructive" className="rounded-none px-3 py-2">
           <AlertDescription className="text-xs break-all">{error}</AlertDescription>
@@ -55,7 +62,7 @@ export function DataTree({ selected, onOpen }: DataTreeProps) {
         <div className="flex flex-col gap-1.5" aria-busy>
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-6 w-full" />)}
         </div>
-      ) : tables.length === 0 ? (
+      ) : tables.length === 0 && Object.keys(sourceErrors).length === 0 ? (
         <p className="px-1 text-xs leading-relaxed text-muted-foreground">
           No data imported. Run <code className="text-foreground">tracebook import data/*</code>
         </p>
@@ -97,7 +104,7 @@ export function DataTree({ selected, onOpen }: DataTreeProps) {
                               {kind}
                             </Badge>
                           ) : null}
-                          <span className="ml-auto pl-2 text-[11px] text-muted-foreground tabular-nums">{count(table.rows)}</span>
+                          <span className="ml-auto pl-2 text-[11px] text-muted-foreground tabular-nums">{table.rows === null ? "source" : count(table.rows)}</span>
                         </Button>
                         {columns.length ? (
                           <ul className="flex flex-col pb-1 pl-10 text-[11px] text-muted-foreground" aria-label={`Matching columns in ${table.name}`}>

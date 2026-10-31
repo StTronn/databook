@@ -1,7 +1,7 @@
 """Run history (.tracebook/history/, last KEEP runs) and a per-block diff between two runs.
 
-Compute blocks are keyed by id. Display blocks get auto ids (chart_2, md_7) that shift when cells are inserted, so
-they are keyed by meaning instead: KPIs by label, prose values by their {{ref}}, charts/tables by title or data.
+Compute blocks are keyed by id, charts/tables by their anchor (core/anchors.py). KPI cards and prose values are keyed
+one level finer than a block: KPIs by label, prose values by their {{ref}}.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def summarize(doc: dict) -> dict:
             if b.get("rowCount") == 1 and b.get("display"):
                 e["values"] = {c["name"]: v for c, v in zip(b["columns"], b["display"][0])}
             elif b.get("display") is not None:
-                e["data"] = _h(b["display"])
+                e["data"] = b.get("rowsHash") or _h(b["display"])   # whole result, any row order (older runs: shown rows)
             put(b["id"], e)
         elif kind == "md":
             for ref, val in _REF_SPAN.findall(b.get("text", "")):
@@ -49,7 +49,7 @@ def summarize(doc: dict) -> dict:
             e = {"error": b.get("error"), "type": b.get("type"), "variant": b.get("variant"),
                  "x": b.get("x"), "y": b.get("y"), "columns": b.get("columns"),
                  "data": _h([s.get("display") for s in b.get("series", [])] or b.get("display"))}
-            put(f"{kind} {b.get('title') or b.get('data') or b['id']}", e)
+            put(b.get("anchor") or f"{kind} {b.get('title') or b.get('data') or b['id']}", e)
     return out
 
 

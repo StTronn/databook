@@ -37,7 +37,8 @@ def _inputs(p: Project) -> tuple[dict[str, float], dict[str, float], tuple]:
     """mtimes: (per notebook, shared inputs that affect every notebook, (theme.css, comments) → refetch only)."""
     mt = lambda f: f.stat().st_mtime if f.exists() else None
     notes = {k: mt(f) for k, f in p.notebooks().items()}
-    shared = {str(f): mt(f) for f in [p.dir / "import.json", p.dir / "config.json", *p.root.glob("models/**/*.xlsx")]}
+    shared = {str(f): mt(f) for f in [p.dir / "import.json", p.dir / "config.json", p.dir / "sources.json",
+                                      *p.root.glob("models/**/*.xlsx")]}
     return notes, shared, (mt(p.root / "theme.css"), mt(p.dir / "comments.json"))
 
 
@@ -151,7 +152,7 @@ def serve(p: Project, port: int, open_browser: bool) -> None:
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
                 if path == "/api/comments":
                     return self._json(comments.add(p, str(body.get("notebook", "")), str(body.get("block", "")),
-                                                   str(body.get("text", ""))))
+                                                   str(body.get("text", "")), str(body.get("anchor") or "") or None))
                 if path == "/api/comments/resolve":
                     return self._json(comments.resolve(p, int(body.get("id")), body.get("note")))
                 name, tpl_name = str(body.get("name", "")), body.get("template")

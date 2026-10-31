@@ -40,6 +40,8 @@ export function typeNote(t: string): string | null {
 
 const RESERVED = new Set("all and any as asc by case create default desc distinct else end from group having in is join limit not null offset on or order select table then union user using when where with".split(" "))
 
-/** `SELECT * FROM <name> LIMIT 100`, quoting the identifier unless it is a plain lowercase non-reserved name. */
-export const selectSql = (name: string) =>
-  `SELECT * FROM ${/^[a-z_][a-z0-9_]*$/.test(name) && !RESERVED.has(name) ? name : `"${name.replaceAll('"', '""')}"`} LIMIT 100`
+const ident = (p: string) => (/^[a-z_][a-z0-9_]*$/.test(p) && !RESERVED.has(p) ? p : `"${p.replaceAll('"', '""')}"`)
+
+/** `SELECT * FROM <name> LIMIT 100`, quoting each part unless it is a plain lowercase non-reserved name. Imported
+ *  table names never contain dots, so a dot always separates source.schema.table. */
+export const selectSql = (name: string) => `SELECT * FROM ${name.split(".").map(ident).join(".")} LIMIT 100`

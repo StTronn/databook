@@ -6,6 +6,8 @@ import time
 import urllib.error
 import urllib.request
 
+import duckdb
+
 import pytest
 
 from tracebook import workspace
@@ -316,3 +318,140 @@ def test_dev_server_reports_run_crash_only_for_that_notebook(ws):
     finally:
         proc.kill()
         proc.wait()
+
+
+def test_identical_rerun_gives_identical_results(ws):
+    from tracebook.history import summarize
+    from tracebook.run import run_notebook
+    # parallel GROUP BY returns groups in a different order run to run unless the stored result is ordered
+    _nb(ws, "a", "```sql g\nSELECT x % 997 AS k, count(*) AS n FROM range(300000) r(x) GROUP BY 1\n```\n\n"
+                 "```sql top\nSELECT k FROM g ORDER BY n DESC, k DESC LIMIT 3\n```\n\n"
+                 "```sql flip\nSELECT * FROM g ORDER BY k DESC\n```\n\n"
+                 "```sql pick\nSELECT k FROM g LIMIT 2 -- trailing comment\n```\n")
+    a, b = run_notebook(ws, "a"), run_notebook(ws, "a")
+    assert summarize(a) == summarize(b) and _blk(a, "g")["rows"] == _blk(b, "g")["rows"]
+    assert [r[0] for r in _blk(a, "g")["rows"][:3]] == [0, 1, 2]           # unordered → stored sorted by every column
+    assert [r[0] for r in _blk(a, "top")["rows"]] == [899, 898, 897]       # the author's ORDER BY is kept
+    assert _blk(a, "flip")["rowsHash"] == _blk(a, "g")["rowsHash"]         # same rows, any order → same hash
+    assert _blk(a, "pick")["status"] == "ok"
+    assert [(d["code"], d["block"]) for d in a["diagnostics"]] == [("UNORDERED_LIMIT", "pick")]
+
+
+def test_comment_stays_on_its_display_block(ws, capsys):
+    from tracebook import comments
+    s = "```sql s\nSELECT k, sum(v) AS v FROM t GROUP BY k\n```\n\n"
+    chart = lambda title: f'```chart\n{{ type: bar, data: s, x: k, y: v, title: "{title}" }}\n```\n\n'
+    _nb(ws, "a", s + chart("Revenue"))
+    assert main(["check"]) == 0
+    assert comments.add(ws, "a", "chart_1", "label the axis")["anchor"] == "chart Revenue"
+    _nb(ws, "a", s + chart("Other") + chart("Revenue"))                     # inserted above: Revenue is now chart_2
+    assert main(["check"]) == 0
+    c = comments.items(ws)[0]
+    assert (c["block"], c["state"]) == ("chart_2", "attached")
+    _nb(ws, "a", s.replace("sum(v)", "max(v)") + chart("Other") + chart("Revenue"))   # its numbers changed
+    assert main(["check"]) == 0
+    assert comments.items(ws)[0]["state"] == "outdated"
+    _nb(ws, "a", s + chart("Other"))                                       # gone: orphan, never moved to chart_1
+    assert main(["check"]) == 0
+    c = comments.items(ws)[0]
+    assert c["state"] == "orphan" and c["orphan"]
+
+
+def test_comment_on_prose_reports_what_changed(ws, capsys):
+    from tracebook import comments
+    _nb(ws, "b", "```sql n\nSELECT count(*) AS n FROM t\n```\n\nThere are {{n.n}} rows.\n")
+    assert main(["check"]) == 0
+    md = next(b["id"] for b in _res(ws, "b")["blocks"] if b["kind"] == "md")
+    assert comments.add(ws, "b", md, "count orders, not rows")["anchor"] == "md There are {{n.n}} rows."
+    _nb(ws, "b", "```sql n\nSELECT count(*) + 1 AS n FROM t\n```\n\nThere are {{n.n}} rows.\n")
+    assert main(["check"]) == 0
+    capsys.readouterr()
+    assert main(["comments"]) == 0
+    assert "changed since this comment: was “There are 3 rows.”, now “There are 4 rows.”" in capsys.readouterr().out
+
+
+def _source_db(path, amounts):
+    import duckdb
+    path.unlink(missing_ok=True)
+    con = duckdb.connect(str(path))
+    con.execute("CREATE SCHEMA sales")
+    con.execute("CREATE TABLE sales.orders AS SELECT * FROM (VALUES " +
+                ", ".join(f"({i}, {a})" for i, a in enumerate(amounts)) + ") v(id, amount)")
+    con.close()
+
+
+def test_source_is_queried_read_only_and_changes_show_in_diff(ws, capsys):
+    _source_db(ws.root / "shop.duckdb", [10, 20, 30])
+    assert main(["source", "add", "shop", "--type", "duckdb", "--path", "shop.duckdb"]) == 0
+    _nb(ws, "a", "```sql spend\nSELECT sum(o.amount) AS total, count(*) AS n FROM shop.sales.orders o\n```\n\n"
+                 "```sql both\nSELECT (SELECT sum(v) FROM t) AS local, total FROM spend\n```\n\n"
+                 "Spend is {{spend.total}}.\n")
+    assert main(["check"]) == 0
+    doc = _res(ws, "a")
+    assert _blk(doc, "spend")["rows"] == [[60, 3]] and _blk(doc, "spend")["reads"] == ["shop.sales.orders"]
+    assert _blk(doc, "both")["rows"] == [[6, 60]]                       # imported table + block, next to a source
+    con = ws.connect()
+    assert ws.attach_sources(con) == {}
+    with pytest.raises(duckdb.Error):                                   # attached READ_ONLY
+        con.execute("CREATE TABLE shop.sales.x AS SELECT 1")
+    con.close()
+    capsys.readouterr()
+    assert main(["schema"]) == 0 and "shop.sales.orders" in capsys.readouterr().out
+    _source_db(ws.root / "shop.duckdb", [10, 20, 30, 40])               # the database changed; the notebook did not
+    assert main(["check"]) == 0
+    capsys.readouterr()
+    assert main(["--json", "diff"]) == 0
+    ch = {c["key"]: c for c in json.loads(capsys.readouterr().out)["changes"]}
+    assert "total: 60 → 100" in ch["spend"]["details"] and ch["{{spend.total}}"]["change"] == "~"
+
+
+def test_unavailable_source_fails_only_its_blocks_and_never_leaks_the_url(ws, monkeypatch, capsys):
+    _source_db(ws.root / "s3cr3t.duckdb", [1])
+    monkeypatch.setenv("SHOP_URL", str(ws.root / "s3cr3t.duckdb"))
+    assert main(["source", "add", "shop", "--type", "duckdb", "--env", "SHOP_URL"]) == 0
+    assert "s3cr3t" not in (ws.dir / "sources.json").read_text()
+    _nb(ws, "a", "```sql s\nSELECT count(*) AS n FROM shop.sales.orders\n```\n\n```sql d\nSELECT n FROM s\n```\n\n"
+                 "```sql ok\nSELECT count(*) AS n FROM t\n```\n")
+    assert main(["check"]) == 0
+    monkeypatch.setenv("SHOP_URL", str(ws.root / "gone" / "s3cr3t.duckdb"))
+    assert main(["check"]) == 1
+    doc = _res(ws, "a")
+    assert _blk(doc, "s")["status"] == "error" and "SOURCE_UNAVAILABLE" in _blk(doc, "s")["error"]
+    assert "$SHOP_URL" in _blk(doc, "s")["error"] and "s3cr3t" not in json.dumps(doc)
+    assert _blk(doc, "d")["status"] == "skipped" and _blk(doc, "ok")["status"] == "ok"
+    monkeypatch.delenv("SHOP_URL")
+    main(["check"])
+    assert "SHOP_URL is not set" in _blk(_res(ws, "a"), "s")["error"]
+    capsys.readouterr()
+    assert main(["source", "add", "x", "--type", "duckdb", "--env", "NOPE_UNSET"]) == 2
+    assert main(["source", "add", "main", "--type", "duckdb", "--path", "a.duckdb"]) == 2      # reserved name
+    assert main(["source", "add", "pg", "--type", "postgres", "--path", "a.duckdb"]) == 2      # URL must be in env
+
+
+def test_unknown_catalog_is_still_a_cross_notebook_ref(ws):
+    _nb(ws, "a", "```sql s\nSELECT * FROM other.sales.orders\n```\n")
+    assert main(["check"]) == 1
+    assert [d["code"] for d in _res(ws, "a")["diagnostics"]] == ["CROSS_NOTEBOOK_REF"]
+
+
+def test_data_browser_lists_and_previews_source_tables(ws, monkeypatch):
+    from tracebook import workspace
+    _source_db(ws.root / "shop.duckdb", [10, 20])
+    assert main(["source", "add", "shop", "--type", "duckdb", "--path", "shop.duckdb"]) == 0
+    _nb(ws, "a", "```sql s\nSELECT sum(amount) AS total FROM shop.sales.orders\n```\n")
+    assert main(["check"]) == 0
+    sch = workspace.schema(ws)
+    src = next(t for t in sch["tables"] if t["name"] == "shop.sales.orders")
+    assert (src["source"], src["rows"], src["readOnly"]) == ("shop.duckdb", None, True)
+    assert [c["name"] for c in src["columns"]] == ["id", "amount"] and src["usedBy"] == [{"notebook": "a", "block": "s"}]
+    assert any(t["name"] == "t" for t in sch["tables"]) and sch["sourceErrors"] == {}
+    pv = workspace.preview(ws, "shop.sales.orders")
+    assert pv["rows"] == [[0, 10], [1, 20]] and pv["rowCount"] is None
+    for bad in ("shop.sales", "nope.sales.orders", "shop.sales.missing"):
+        with pytest.raises(ProjectError):
+            workspace.preview(ws, bad)
+    monkeypatch.setenv("GONE_URL", str(ws.root / "s3cr3t" / "x.duckdb"))
+    srcs = ws.sources | {"gone": {"type": "duckdb", "env": "GONE_URL"}}
+    ws.save_sources(srcs)
+    err = workspace.schema(ws)["sourceErrors"]["gone"]
+    assert "$GONE_URL" in err and "s3cr3t" not in err

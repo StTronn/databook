@@ -3,7 +3,8 @@ export type Diagnostic = { line: number; code: string; message: string; severity
 export type Column = { name: string; type: string }
 // title: from ```sql id "Title" (null if absent); usedBy: ids of blocks that read this one
 // reads: imported tables this block reads (data browser "used by")
-type Base = { id: string; line: number; deps: string[]; reads: string[]; usedBy: string[]; title?: string | null; error?: string }
+// anchor: stable identity across runs (tracebook/core/anchors.py); comments attach to it, not to the id
+type Base = { id: string; anchor?: string; line: number; deps: string[]; reads: string[]; usedBy: string[]; title?: string | null; error?: string }
 export type SheetCell = { a: string; v: unknown; f: string | null; fmt: string | null; d: string }
 export type ComputeBlock = Base & {
   kind: "sql" | "python" | "sheet"
@@ -71,12 +72,16 @@ export type Settings = {
 export type Workspace = { name: string; timezone: string; notebooks: NotebookEntry[]; templates: string[]; settings: Settings }
 export type SchemaColumn = { name: string; type: string; source?: string | null; values?: string[] } // values: all distinct when ≤ 10
 export type SchemaTable = {
-  name: string; source: string; rows: number; files: string[]; columns: SchemaColumn[]; usedBy: { notebook: string; block: string }[]
+  // source tables (`shop.sales.orders`, source "shop.postgres"): readOnly, rows null (never counted remotely)
+  name: string; source: string; rows: number | null; files: string[]; columns: SchemaColumn[]; usedBy: { notebook: string; block: string }[]
+  readOnly?: boolean
 }
-export type Preview = { table: string; columns: Column[]; rows: unknown[][]; display: string[][]; rowCount: number; truncated: boolean }
+export type Preview = { table: string; columns: Column[]; rows: unknown[][]; display: string[][]; rowCount: number | null; truncated: boolean }
 
 // Review comments (GET/POST /api/comments, dev only); the agent resolves them with `tracebook comments resolve`.
 export type Comment = {
   id: number; notebook: string; path: string; block: string; line: number; text: string
   status: "open" | "resolved"; created: string; resolution: string | null; resolved: string | null
+  // outdated: block changed since the comment (seen = then, now = today); orphan: block gone (never shown on another block)
+  anchor?: string; state: "attached" | "outdated" | "orphan"; orphan: boolean; now?: string; seen?: { brief: string; ranAt: string | null }
 }

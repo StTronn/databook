@@ -8,7 +8,7 @@ import { useComments } from "@/hooks/use-comments"
 
 /** Review thread for one block: open/resolved comments + a box to add one. The agent picks them up with
  *  `tracebook comments` and answers with `tracebook comments resolve <id> --note …`. */
-export function BlockComments({ block }: { block: string }) {
+export function BlockComments({ block, anchor }: { block: string; anchor?: string }) {
   const { forBlock, add, resolve } = useComments()
   const [text, setText] = useState("")
   const [pending, setPending] = useState(false)
@@ -29,7 +29,7 @@ export function BlockComments({ block }: { block: string }) {
   }
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (text.trim()) void run(() => add(block, text), () => setText(""))
+    if (text.trim()) void run(() => add(block, anchor, text), () => setText(""))
   }
 
   return (
@@ -41,6 +41,11 @@ export function BlockComments({ block }: { block: string }) {
             <Badge variant={c.status === "open" ? "secondary" : "outline"} className="uppercase">
               {c.status}
             </Badge>
+            {c.state === "outdated" ? (
+              <Badge variant="outline" className="uppercase">
+                changed since
+              </Badge>
+            ) : null}
             {c.status === "open" ? (
               <Button variant="ghost" size="xs" className="ml-auto text-muted-foreground" disabled={pending} onClick={() => void run(() => resolve(c.id))}>
                 <CheckIcon />
@@ -49,6 +54,11 @@ export function BlockComments({ block }: { block: string }) {
             ) : null}
           </div>
           <p className="break-words whitespace-pre-wrap">{c.text}</p>
+          {c.state === "outdated" && c.seen ? (
+            <p className="break-words text-muted-foreground">
+              was “{c.seen.brief}” · now “{c.now}”
+            </p>
+          ) : null}
           {c.resolution ? <p className="break-words whitespace-pre-wrap text-muted-foreground">→ {c.resolution}</p> : null}
         </div>
       ))}

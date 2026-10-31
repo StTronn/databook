@@ -8,7 +8,11 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from tracebook.core.values import fmt_cell, to_json
-from tracebook.project import NB_DIR, Project, ProjectError
+import duckdb
+
+from tracebook import workspace
+from tracebook.project import (NB_DIR, RESERVED_SOURCES, SOURCE_NAME, SOURCE_TYPES, SYSTEM_SCHEMAS, Project,
+                               ProjectError)
 from tracebook.workspace import new_notebook
 
 PKG = Path(__file__).parent
@@ -107,7 +111,59 @@ def cmd_schema(args):
     if blk and not args.table:
         lines.append("block outputs (from last check):")
         lines += [f"  {b['id']:<20} {b['rowCount']:,} rows  [{', '.join(c['name'] for c in b['columns'])}]" for b in blk]
-    _out(args, {"tables": m}, "\n".join(lines) or "(no tables imported; run `tracebook import <files>`)")
+    src = workspace.source_tables(p) if not args.table else {}
+    for name, s in src.items():
+        lines.append(f"source {name} ({s['type']}, read-only; query as {name}.<schema>.<table>)"
+                     + (f"  ⚠ unavailable: {s['error']}" if s.get("error") else ""))
+        for t in s.get("tables", []):
+            lines.append(f"  {t['name']}")
+            lines += [f"    {c['name']:<22} {c['type']}" for c in t["columns"]]
+        if s.get("more"):
+            lines.append(f"  … {s['more']} more table(s); `tracebook query` information_schema to see them")
+    _out(args, {"tables": m, "sources": src},
+         "\n".join(lines) or "(no tables imported; run `tracebook import <files>` or `tracebook source add`)")
+
+
+def cmd_source(args):
+    p = Project.find()
+    srcs = p.sources
+    if args.action == "list":
+        _out(args, {"sources": srcs}, "\n".join(f"{n}  {s['type']}  " + (f"${s['env']}" if s.get("env") else s["path"])
+                                                for n, s in srcs.items()) or "no sources; `tracebook source add`")
+        return 0
+    if not args.name:
+        raise ProjectError(f"usage: tracebook source {args.action} <name> …")
+    if args.action == "remove":
+        if srcs.pop(args.name, None) is None:
+            raise ProjectError(f"no source {args.name!r}")
+        p.save_sources(srcs)
+        print(f"removed source {args.name}")
+        return 0
+    if not SOURCE_NAME.match(args.name) or args.name in RESERVED_SOURCES or args.name.startswith("nb_"):
+        raise ProjectError(f"source name {args.name!r}: use lower-case letters, digits and _ (not main, data, "
+                           "memory, system, temp or nb_…)")
+    if args.name in srcs:
+        raise ProjectError(f"source {args.name!r} exists; `tracebook source remove {args.name}` first")
+    if args.type not in SOURCE_TYPES:
+        raise ProjectError(f"--type must be one of {', '.join(SOURCE_TYPES)}")
+    if bool(args.env) == bool(args.path) or (args.path and args.type in ("postgres", "mysql")):
+        raise ProjectError("give --env VAR (a URL or path held in an environment variable; required for postgres/mysql) "
+                           "or --path FILE (sqlite/duckdb files)")
+    s = {"type": args.type, **({"env": args.env} if args.env else {"path": args.path})}
+    con = duckdb.connect()                # test it before saving
+    try:
+        p.attach(con, args.name, s)
+        n = con.execute("SELECT count(*) FROM duckdb_tables() WHERE database_name = ? AND schema_name NOT IN "
+                        "(SELECT unnest(?))", [args.name, list(SYSTEM_SCHEMAS)]).fetchone()[0]
+    except ProjectError:
+        raise
+    except Exception as e:
+        raise ProjectError(f"cannot attach {args.name}: " +
+                           p.redact(f"{type(e).__name__}: {str(e).splitlines()[0]}", {args.name: s})) from None
+    finally:
+        con.close()
+    p.save_sources({**srcs, args.name: s})
+    print(f"added source {args.name} ({args.type}, {n} table(s)); read-only. `tracebook schema` lists its tables")
 
 
 def cmd_query(args):
@@ -117,9 +173,15 @@ def cmd_query(args):
     with p.lock():                       # wait for a running check/dev rerun: DuckDB refuses readers while it writes
         con = p.connect(read_only=True, schema=schema)
         try:
-            cur = con.execute(args.sql)
-            cols = [d[0] for d in cur.description or []]
-            rows = cur.fetchmany(args.n + 1)
+            for name, err in p.attach_sources(con).items():
+                print(f"⚠ source {name} unavailable: {err}", file=sys.stderr)
+            try:
+                cur = con.execute(args.sql)
+                cols = [d[0] for d in cur.description or []]
+                rows = cur.fetchmany(args.n + 1)
+            except Exception as e:       # one line, secrets redacted
+                print(f"✗ {type(e).__name__}: {p.redact(str(e).splitlines()[0] if str(e) else '')}", file=sys.stderr)
+                return 1
         finally:
             con.close()
     more = len(rows) > args.n
@@ -200,6 +262,8 @@ def cmd_comments(args):
     cs = comments.items(p, p.nb(args.nb).key if args.nb else None, include_resolved=args.all)
     text = [f"#{c['id']} [{c['status']}] @{c['block']} ({c['path']}:{c['line']}): {c['text']}"
             + ("\n    ⚠ block no longer exists; resolve with a note" if c["orphan"] and c["status"] == "open" else "")
+            + (f"\n    ⚠ changed since this comment: was “{c['seen']['brief']}”, now “{c['now']}”"
+               if c["state"] == "outdated" and c["status"] == "open" else "")
             + (f"\n    → {c['resolution']}" if c["resolution"] else "") for c in cs]
     _out(args, {"comments": cs}, "\n".join(text) or "no open comments")
 
@@ -345,6 +409,13 @@ def main(argv=None) -> int:
     s.add_argument("name")
     s.add_argument("--template")
     s.set_defaults(fn=cmd_new)
+    s = sub.add_parser("source", help="read-only databases notebooks can query: add/list/remove")
+    s.add_argument("action", choices=["add", "list", "remove"])
+    s.add_argument("name", nargs="?")
+    s.add_argument("--type", choices=sorted(SOURCE_TYPES))
+    s.add_argument("--env", help="environment variable holding the URL (postgres://…, mysql DSN) or file path")
+    s.add_argument("--path", help="sqlite/duckdb file (relative to the workspace)")
+    s.set_defaults(fn=cmd_source)
     s = sub.add_parser("diff", help="per-block changes between the last two runs with different notebook/data")
     s.add_argument("--nb", help="notebook (default: the only one)")
     s.set_defaults(fn=cmd_diff)

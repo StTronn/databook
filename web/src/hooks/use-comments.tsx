@@ -6,7 +6,7 @@ import type { Comment } from "@/types"
 type Comments = {
   enabled: boolean
   forBlock: (block: string) => Comment[]
-  add: (block: string, text: string) => Promise<void>
+  add: (block: string, anchor: string | undefined, text: string) => Promise<void>
   resolve: (id: number, note?: string) => Promise<void>
 }
 
@@ -25,10 +25,13 @@ export function CommentsProvider({ notebook, children }: { notebook: string | nu
   const { data } = useApi<{ comments: Comment[] }>(live && notebook ? `/api/comments?nb=${encodeURIComponent(notebook)}` : null)
   const byBlock = useMemo(() => {
     const m = new Map<string, Comment[]>()
-    for (const c of data?.comments ?? []) m.set(c.block, [...(m.get(c.block) ?? []), c])
+    for (const c of data?.comments ?? []) if (!c.orphan) m.set(c.block, [...(m.get(c.block) ?? []), c])
     return m
   }, [data])
-  const add = useCallback((block: string, text: string) => post("/api/comments", { notebook, block, text }), [notebook])
+  const add = useCallback(
+    (block: string, anchor: string | undefined, text: string) => post("/api/comments", { notebook, block, anchor, text }),
+    [notebook],
+  )
   const resolve = useCallback((id: number, note?: string) => post("/api/comments/resolve", { id, note }), [])
   const value = useMemo(
     () => ({ enabled: live && !!notebook, forBlock: (b: string) => byBlock.get(b) ?? NONE, add, resolve }),

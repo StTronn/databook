@@ -102,7 +102,7 @@ function TraceBody({ block, col }: { block: Block; col?: string }) {
         ) : null}
         {comments.enabled ? (
           <Field label={`Comments · ${comments.forBlock(block.id).filter((c) => c.status === "open").length} open`}>
-            <BlockComments block={block.id} />
+            <BlockComments block={block.id} anchor={block.anchor} />
           </Field>
         ) : null}
         <Field label="Depends on">

@@ -31,8 +31,9 @@ export function useApi<T>(url: string | null) {
   return { data: same ? s.data : null, error: same ? s.error : null, loading: req !== null && s.req !== req }
 }
 
-/** Imported tables of the dev-server workspace (`GET /api/schema`); refetches when the live version bumps. */
+/** Imported + source tables of the dev-server workspace (`GET /api/schema`); refetches when the live version bumps.
+ *  sourceErrors: sources that could not be attached (redacted message). */
 export function useSchema() {
-  const { data, error, loading } = useApi<{ tables: SchemaTable[] }>("/api/schema")
-  return { tables: data?.tables ?? null, error, loading }
+  const { data, error, loading } = useApi<{ tables: SchemaTable[]; sourceErrors?: Record<string, string> }>("/api/schema")
+  return { tables: data?.tables ?? null, sourceErrors: data?.sourceErrors ?? {}, error, loading }
 }
