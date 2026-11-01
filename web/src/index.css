@@ -5,6 +5,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
+/* Palettes (header switcher, <html data-palette>): each file overrides tokens under html[data-palette="…"]. */
+@import "./themes/fonts.css";
+@import "./themes/enterprise.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -79,6 +82,32 @@
   --info: hsl(311 28% 40%);
 }
 
+/* Type, density and elevation tokens, shared by both modes; palettes override them on html[data-palette]. */
+:root {
+  --font-body: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-code: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-body);
+  --text-base-size: 13px;
+  --shadow-card: 0 0 #0000;
+  --card-border: var(--border);
+  /* small labels (KPI names, column heads, panel headers): terminal = tracked uppercase */
+  --label-size: 11px;
+  --label-weight: 400;
+  --label-tracking: 0.1em;
+  --label-transform: uppercase;
+  /* heading scale: notebook title, section (h2), subsection (h3) */
+  --title-size: 1.125rem;
+  --h2-size: 1.125rem;
+  --h3-size: 1rem;
+  --heading-weight: 600;
+  --heading-tracking: 0;
+  /* KPI numbers */
+  --kpi-font: var(--font-body);
+  --kpi-size: 1.5rem;
+  --kpi-weight: 500;
+  --chevron-size: 1rem;           /* section/cell collapse chevrons */
+}
+
 /* TanStack Charts follow the tokens (the tooltip is appended to <body>, so its vars live on :root too). */
 :root {
   --ts-chart-1: var(--chart-1);
@@ -92,15 +121,15 @@
   --ts-chart-tooltip-border: 1px solid var(--border);
   --ts-chart-tooltip-border-radius: var(--radius);
   --ts-chart-tooltip-shadow: none;
-  --ts-chart-tooltip-font: 400 12px/1.4 "JetBrains Mono Variable", ui-monospace, monospace;
+  --ts-chart-tooltip-font: 400 12px/1.4 var(--font-body);
   --ts-chart-crosshair-label-halo: var(--background);
   --ts-chart-crosshair-marker-fill: var(--background);
   --ts-chart-focus-fill: var(--background);
 }
 
 @theme inline {
-  --font-sans: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-code);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -134,10 +163,10 @@
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
-  /* smui: flat surfaces, no drop shadows on inline elements (overlays keep shadow-md/lg) */
+  /* inline elements: --shadow-card (flat by default); overlays keep shadow-md/lg */
   --shadow-2xs: 0 0 #0000;
-  --shadow-xs: 0 0 #0000;
-  --shadow-sm: 0 0 #0000;
+  --shadow-xs: var(--shadow-card);
+  --shadow-sm: var(--shadow-card);
 }
 
 @layer base {
@@ -148,7 +177,13 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-background text-foreground font-sans text-[13px] antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: var(--text-base-size);
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
   }
   ::selection {
     background: color-mix(in srgb, var(--primary) 22%, transparent);
@@ -167,6 +202,33 @@
 .ts-chart__polar-grid text {
   fill: var(--muted-foreground);
   font-size: 12px;
+}
+
+/* Semantic type roles: components use these instead of fixed sizes/cases, so palettes can restyle them. */
+@layer components {
+  .tb-label {
+    font-size: var(--label-size);
+    font-weight: var(--label-weight);
+    letter-spacing: var(--label-tracking);
+    text-transform: var(--label-transform);
+  }
+  .tb-title,
+  .tb-h2,
+  .tb-h3 {
+    font-family: var(--font-heading);
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+  }
+  .tb-title { font-size: var(--title-size); }
+  .tb-h2 { font-size: var(--h2-size); }
+  .tb-h3 { font-size: var(--h3-size); }
+  .tb-kpi {
+    font-family: var(--kpi-font);
+    font-size: var(--kpi-size);
+    font-weight: var(--kpi-weight);
+    letter-spacing: var(--heading-tracking);
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* ── notebook ── */
@@ -188,7 +250,7 @@
   --tw-prose-pre-bg: var(--muted);
   --tw-prose-th-borders: var(--border);
   --tw-prose-td-borders: var(--border);
-  font-size: 13px;
+  font-size: var(--text-base-size);
   line-height: 1.7;
 }
 .tb-prose > :first-child { margin-top: 0; }

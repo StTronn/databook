@@ -1,0 +1,96 @@
+/* enterprise palette — after panxo.com (Refero guide): warm matte "financial data terminal".
+   Mona Sans headings + Inter body, Ledger White / Parchment surfaces, Coal Ink text, Smolder orange primary,
+   Signal Violet for data/info. Light is canonical; dark is a warm near-black counterpart (Panxo ships no dark). */
+
+/* Mode-independent: type, density, radius (cards = rounded-xl = 0.45rem*1.4 ≈ 10px; rounded-md ≈ 6px badges). */
+html[data-palette="enterprise"] {
+  --font-heading: "Mona Sans Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-base-size: 14px;
+  --radius: 0.45rem;
+  /* Refero "Subtle" shadow minus its 1px ring (cards already draw --border) */
+  --shadow-card: 0 1px 2px 0 rgb(28 26 23 / 0.05);   /* hairline border + barely-there lift */
+  /* Panxo: sentence-case labels, bold tight-tracked headlines, big confident metrics */
+  --label-size: 12px;
+  --label-weight: 500;
+  --label-tracking: 0;
+  --label-transform: none;
+  --title-size: 1.5rem;
+  --h2-size: 1.0625rem;
+  --h3-size: 0.9375rem;
+  --heading-weight: 650;
+  --heading-tracking: -0.015em;
+  --kpi-font: var(--font-heading);
+  --kpi-size: 1.5rem;
+  --kpi-weight: 600;
+  --chevron-size: 0.875rem;
+}
+
+html[data-palette="enterprise"][data-theme="light"] {
+  color-scheme: light;
+  --background: #fafafa;            /* Ledger White */
+  --foreground: #1c1a17;            /* Coal Ink */
+  --card: #ffffff;                  /* Pure White elevated cards */
+  --card-foreground: #1c1a17;
+  --popover: #ffffff;
+  --popover-foreground: #1c1a17;
+  --primary: #c8460f;               /* Smolder #ff6020 deepened for AA (4.8:1 w/ white, 4.6:1 as link text) */
+  --primary-foreground: #ffffff;
+  --secondary: #f1eee8;
+  --secondary-foreground: #1c1a17;
+  --muted: #f7f3eb;                 /* Parchment */
+  --muted-foreground: #5a5957;      /* Graphite, 6.3:1 on Parchment */
+  --accent: #f1eee8;                /* warm hover wash */
+  --accent-foreground: #1c1a17;
+  --destructive: #d92d20;
+  --destructive-foreground: #ffffff;
+  --border: #e6e4e0;                /* between Ash and Fossil; Ash alone vanishes on #fafafa */
+  --input: #dcdad6;
+  --ring: #c8460f;
+  --border-hover: #bab9b8;          /* Fossil */
+  /* categorical: orange, signal violet, teal, ochre, fuchsia, graphite (≥2.9:1 on bg, distinct hue+lightness) */
+  --chart-1: #ff6020;
+  --chart-2: #777eff;
+  --chart-3: #0d9488;
+  --chart-4: #ca8a04;
+  --chart-5: #c026d3;
+  --chart-6: #5a5957;
+  --success: #047a33;               /* Mint Pulse #05933b darkened for AA text (5.2:1) */
+  --warning: #b45309;
+  --info: #731fff;                  /* Deep Violet */
+}
+
+html[data-palette="enterprise"][data-theme="dark"] {
+  color-scheme: dark;
+  --background: #141311;            /* warm near-black */
+  --foreground: #ede9e2;
+  --card: #1c1a17;                  /* Coal Ink as surface */
+  --card-foreground: #ede9e2;
+  --popover: #22201c;
+  --popover-foreground: #ede9e2;
+  --primary: #ff6a2e;               /* full-strength Smolder works on dark; dark fg 6.1:1 */
+  --primary-foreground: #1c1a17;
+  --secondary: #26231f;
+  --secondary-foreground: #ede9e2;
+  --muted: #26231f;
+  --muted-foreground: #a8a49d;      /* 6.3:1 on muted */
+  --accent: #2a2622;
+  --accent-foreground: #ede9e2;
+  --destructive: #f06656;
+  --destructive-foreground: #1c1a17;
+  --border: #2f2c27;
+  --input: #3a3631;
+  --ring: #ff6a2e;
+  --border-hover: #57534c;
+  --chart-1: #ff6a2e;
+  --chart-2: #8f95ff;
+  --chart-3: #2dd4bf;
+  --chart-4: #facc15;
+  --chart-5: #e879f9;
+  --chart-6: #a8a49d;
+  --success: #3ecf78;
+  --warning: #f5a524;
+  --info: #a3a7ff;
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+}

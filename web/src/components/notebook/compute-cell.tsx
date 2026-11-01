@@ -47,7 +47,7 @@ export function ComputeCell({ block }: { block: ComputeBlock }) {
   if (view === "report") {
     return (
       <Card className="gap-2 py-3">
-        <div className="px-3 text-[11px] tracking-wider text-muted-foreground uppercase">{blockLabel(block)}</div>
+        <div className="tb-label px-3 text-muted-foreground">{blockLabel(block)}</div>
         <div className="flex flex-col gap-2 px-3">
           {block.grid ? <SheetGrid grid={block.grid} /> : null}
           <StatusNote block={block} />
@@ -63,7 +63,7 @@ export function ComputeCell({ block }: { block: ComputeBlock }) {
           <div className="flex min-w-0 items-center gap-2 px-2 py-1.5">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="icon-xs" aria-label={codeOpen ? "Hide code" : "Show code"}>
-                <ChevronRightIcon className={codeOpen ? "rotate-90 transition-transform" : "transition-transform"} />
+                <ChevronRightIcon className={cn("size-(--chevron-size) text-muted-foreground transition-transform", codeOpen && "rotate-90")} />
               </Button>
             </CollapsibleTrigger>
             <KindBadge kind={block.kind} />

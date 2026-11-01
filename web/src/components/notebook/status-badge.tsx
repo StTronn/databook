@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { ComputeBlock } from "@/types"
 
-export const tagClass = "rounded-none px-1.5 py-0 text-[10px] font-normal tracking-wider uppercase"
+export const tagClass = "tb-label rounded-none px-1.5 py-0 text-[10px]"
 
 export function KindBadge({ kind }: { kind: string }) {
   return (

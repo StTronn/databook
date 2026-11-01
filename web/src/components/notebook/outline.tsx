@@ -27,7 +27,7 @@ export function Outline() {
                 onClick={() => scrollTo(b.id)}
                 title={`${b.kind} · ${b.id}`}
               >
-                <span className="w-9 shrink-0 text-left text-[10px] uppercase opacity-60">{b.kind}</span>
+                <span className="w-9 shrink-0 text-left tb-label text-[10px] opacity-60">{b.kind}</span>
                 <span className="truncate">{blockLabel(b)}</span>
               </Button>
             ))}

@@ -12,7 +12,7 @@ export function TableView({ block }: { block: TableBlock }) {
   return (
     <Card className="gap-2 py-3">
       <div className="flex min-w-0 items-center gap-2 px-3">
-        <span className="min-w-0 flex-1 truncate text-[11px] tracking-wider text-muted-foreground uppercase">
+        <span className="min-w-0 flex-1 truncate tb-label text-muted-foreground">
           {block.title ?? `${block.data} · ${plural(block.rowCount ?? 0, "row")}`}
         </span>
         <Button variant="ghost" size="xs" className="text-[11px] text-muted-foreground" onClick={() => openTrace(block.data)}>

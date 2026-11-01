@@ -191,7 +191,7 @@ export function App() {
       <>
         {banner}
         <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">{doc.title}</h1>
+          <h1 className="tb-title">{doc.title}</h1>
           {doc.meta.description ? (
             <p className="text-xs text-muted-foreground">
               {doc.meta.description}

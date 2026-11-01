@@ -22,8 +22,8 @@ function Kpi({ item }: { item: KpiItem }) {
       title={item.error ?? (ref ? `trace ${ref}` : undefined)}
       className={cn("min-w-0 gap-2 px-3 py-3", trace && "cursor-pointer transition-colors outline-none hover:border-border-hover focus-visible:border-ring")}
     >
-      <div className="truncate text-[11px] tracking-wider text-muted-foreground uppercase">{item.label}</div>
-      <div className={cn("truncate text-2xl font-medium tabular-nums", item.error && "text-destructive")}>{item.value || (item.error ? "#REF" : "—")}</div>
+      <div className="tb-label truncate text-muted-foreground">{item.label}</div>
+      <div className={cn("tb-kpi truncate", item.error && "text-destructive")}>{item.value || (item.error ? "#REF" : "—")}</div>
       {item.error ? (
         <div className="truncate text-[11px] text-destructive">{item.error}</div>
       ) : item.deltaText ? (

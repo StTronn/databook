@@ -94,7 +94,7 @@ export function Centre({ value, label }: { value: string; label?: string }) {
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
       <span className="text-xl font-semibold tabular-nums text-foreground">{value}</span>
-      {label ? <span className="max-w-[40%] truncate text-[10px] tracking-wider text-muted-foreground uppercase">{label}</span> : null}
+      {label ? <span className="max-w-[40%] truncate tb-label text-[10px] text-muted-foreground">{label}</span> : null}
     </div>
   )
 }

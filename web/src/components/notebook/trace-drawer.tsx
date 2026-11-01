@@ -16,7 +16,7 @@ import type { Block } from "@/types"
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="flex min-w-0 flex-col gap-1.5">
-      <h3 className="text-[11px] tracking-[1.5px] text-muted-foreground uppercase">{label}</h3>
+      <h3 className="tb-label text-muted-foreground">{label}</h3>
       {children}
     </section>
   )

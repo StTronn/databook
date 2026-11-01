@@ -10,7 +10,7 @@ import { ChartAlert } from "./unknown-variant"
 // Contract (owned by the charts pass): one card per chart block. `onTrace(blockId)` opens the trace drawer.
 export type ChartCardProps = { block: ChartBlock; onTrace?: (blockId: string) => void }
 
-const label = "text-[11px] tracking-wider uppercase"
+const label = "tb-label"
 
 /** A drawing bug in one chart must not take down the notebook. */
 type BoundaryProps = { block: ChartBlock; children: ReactNode }

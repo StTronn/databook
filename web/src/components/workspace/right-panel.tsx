@@ -10,7 +10,7 @@ import type { Settings } from "@/types"
 
 export type PanelTab = "outputs" | "settings"
 
-const label = "text-[11px] tracking-[1.5px] text-muted-foreground uppercase"
+const label = "tb-label text-muted-foreground"
 
 /** Variable explorer: every compute block of the current doc; click → trace drawer. */
 function Outputs() {
@@ -113,11 +113,11 @@ export function RightPanel({ tab, onTab, hasDoc, settings }: Props) {
   return (
     <Tabs value={value} onValueChange={(v) => onTab(v as PanelTab)} className="h-full min-h-0 gap-0">
       <TabsList variant="line" className="h-10 w-full shrink-0 justify-start rounded-none border-b px-2">
-        <TabsTrigger value="outputs" className="flex-none text-[11px] tracking-[1.5px] uppercase">
+        <TabsTrigger value="outputs" className="tb-label flex-none">
           Outputs
         </TabsTrigger>
         {settings ? (
-          <TabsTrigger value="settings" className="flex-none text-[11px] tracking-[1.5px] uppercase">
+          <TabsTrigger value="settings" className="tb-label flex-none">
             Settings
           </TabsTrigger>
         ) : null}

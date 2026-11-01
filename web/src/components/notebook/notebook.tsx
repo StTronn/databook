@@ -28,12 +28,12 @@ function SectionView({ section }: { section: Section }) {
       >
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="icon-xs" aria-label={open ? `Collapse ${h.text}` : `Expand ${h.text}`}>
-            <ChevronRightIcon className={cn("transition-transform", open && "rotate-90")} />
+            <ChevronRightIcon className={cn("size-(--chevron-size) text-muted-foreground transition-transform", open && "rotate-90")} />
           </Button>
         </CollapsibleTrigger>
         <Tag
           id={section.key}
-          className={cn("tb-heading min-w-0 flex-1 scroll-mt-4 font-semibold", h.level === 1 ? "text-lg" : "text-base")}
+          className={cn("min-w-0 flex-1 scroll-mt-4", h.level === 1 ? "tb-h2" : "tb-h3")}
           dangerouslySetInnerHTML={{ __html: h.html }}
         />
         {!open && cells ? <span className="shrink-0 text-[11px] text-muted-foreground">{plural(cells, "cell")}</span> : null}

@@ -38,11 +38,11 @@ export function BlockComments({ block, anchor }: { block: string; anchor?: strin
         <div key={c.id} className="flex flex-col gap-1 border p-2 text-xs">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span>#{c.id}</span>
-            <Badge variant={c.status === "open" ? "secondary" : "outline"} className="uppercase">
+            <Badge variant={c.status === "open" ? "secondary" : "outline"} className="tb-label">
               {c.status}
             </Badge>
             {c.state === "outdated" ? (
-              <Badge variant="outline" className="uppercase">
+              <Badge variant="outline" className="tb-label">
                 changed since
               </Badge>
             ) : null}

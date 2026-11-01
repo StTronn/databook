@@ -21,7 +21,7 @@ import type { Preview, SchemaColumn, SchemaTable } from "@/types"
 // onOpenBlock navigates to a notebook cell that reads this table.
 export type TablePageProps = { table: string; onOpenBlock?: (notebook: string, block: string) => void }
 
-const label = "text-[11px] tracking-wider text-muted-foreground uppercase"
+const label = "tb-label text-muted-foreground"
 const head = cn(label, "h-8 font-normal")
 
 function ErrorAlert({ title, message }: { title: string; message: string }) {

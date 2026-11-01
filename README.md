@@ -3,11 +3,11 @@
 Agent-native data notebook. You ask Claude Code a question about your data files (CSV, Excel, JSON, SQLite, Parquet). It answers inside a notebook of SQL / Python / `.xlsx`-model blocks run on DuckDB. Every number in the answer traces back to the block that computed it, and you can check it, comment on it, and rerun it on new data.
 
 ![notebook view](docs/notebook-view.png)
-*Notebook view of `examples/online-retail/`: a customer-insights notebook Claude Code built from the UCI Online Retail II data. Every £ figure links to the block that computed it.*
+*Notebook view of `examples/olist/` in the Enterprise theme (light): the August 2018 monthly business review Claude Code built from the Olist marketplace data. Every R$ figure links to the block that computed it.*
 
 ![tracebook demo](docs/tracebook_demo.gif)
 
-Full-resolution video: [docs/tracebook_demo.mp4](docs/tracebook_demo.mp4). The video shows `examples/razorpay-demo/` (Razorpay checkout funnel from dashboard exports).
+Full-resolution video: [docs/tracebook_demo.mp4](docs/tracebook_demo.mp4). The video scrolls through the same notebook.
 
 ## Install
 ```bash
@@ -22,7 +22,7 @@ tracebook skill install      # agent skill → ~/.claude/skills/tracebook
    - reads `tracebook schema` and samples the data with `tracebook query`,
    - writes the notebook: SQL / Python / sheet blocks, charts, and a summary sentence whose numbers are references like `{{funnel.paid}}`, not typed-in values,
    - runs `tracebook check` until it reports `✓ 0 error(s)` (it catches broken SQL, missing columns, bad references and type problems, each with a file and line).
-4. **Review it.** `tracebook dev` opens the viewer. Click any number to see the query and rows behind it. Switch between the Notebook view (everything) and the Report view (results only). Leave a comment where something looks wrong ("count per user, not per session").
+4. **Review it.** `tracebook dev` opens the viewer. Click any number to see the query and rows behind it. Switch between the Notebook view (everything) and the Report view (results only), and pick a theme (Terminal or Enterprise) from the header. Leave a comment where something looks wrong ("count per user, not per session").
 5. **Fix from comments.** On its next turn the agent reads `tracebook comments`, changes the notebook, and resolves each comment with a note saying what changed.
 6. **Share.** `tracebook export` writes a self-contained HTML report. `tracebook export --block <id> out.csv` writes one block's result as a CSV.
 7. **Rerun on new data.** Import the new export and run `tracebook check`. `tracebook diff` lists which blocks and numbers changed since the previous run.

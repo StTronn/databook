@@ -15,7 +15,7 @@ function Section({ label, action, children }: { label: string; action?: ReactNod
     <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-1">
       <div className="flex items-center gap-1">
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="xs" className="min-w-0 flex-1 justify-start text-[11px] font-normal tracking-[1.5px] text-muted-foreground uppercase">
+          <Button variant="ghost" size="xs" className="min-w-0 flex-1 justify-start tb-label text-muted-foreground">
             <ChevronRightIcon className={cn("transition-transform", open && "rotate-90")} />
             {label}
           </Button>

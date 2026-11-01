@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 // Contract (owned by the data-browser pass): sidebar tree of imported tables grouped by source, with search.
 export type DataTreeProps = { selected?: string | null; onOpen: (table: string) => void }
 
-const label = "text-[10px] tracking-wider text-muted-foreground uppercase"
+const label = "tb-label text-[10px] text-muted-foreground"
 
 export function DataTree({ selected, onOpen }: DataTreeProps) {
   const { live } = useLive()

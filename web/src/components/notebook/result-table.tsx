@@ -28,7 +28,7 @@ export function ResultTable({ columns, rows, numeric, rowCount, truncated, highl
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {columns.map((c, i) => (
-              <TableHead key={c + i} className={cn("h-8 text-[11px] font-normal tracking-wider text-muted-foreground uppercase", cls(i))}>
+              <TableHead key={c + i} className={cn("tb-label h-8 text-muted-foreground", cls(i))}>
                 {c}
               </TableHead>
             ))}
