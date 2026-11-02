@@ -1,7 +1,7 @@
 ---
 name: tracebook
 description: Build data notebooks/reports from data files or databases (CSV, Excel, JSON, SQLite, Parquet — payment exports, sales sheets, CRM dumps) with the `tracebook` CLI — SQL, Python and spreadsheet-model blocks, KPIs, charts, tables, every number traceable to the block that computed it, exported as a shareable HTML report (`tracebook export`) or a block's result as CSV (`tracebook export --block <id> <file.csv>`). Use when the user wants analysis, a dashboard, a funnel, cohorts, a what-if model or a report built from data, or mentions a tracebook project / notebook.md.
-allowed-tools: Bash(tracebook:*), Bash(uv tool install:*)
+allowed-tools: Bash(tracebook:*), Bash(npm i -g tracebook-cli:*)
 ---
 
 # tracebook
@@ -10,7 +10,7 @@ A workspace is a folder with `notebooks/**/<name>.md` (you edit them; `tracebook
 the imported data, block ids are per notebook), `data/` (raw files, never modified), `models/` (.xlsx models for
 `sheet` blocks) and `.tracebook/` (database + results; never edit). With several notebooks pass `--nb <name>`.
 
-If `tracebook` is not on PATH: `uv tool install <path-to-repo>/tracebook` (or `pipx install …`).
+If `tracebook` is not on PATH: `npm i -g tracebook-cli` (or prefix each command with `npx tracebook-cli`).
 
 ## Workflow (always in this order)
 

@@ -374,9 +374,26 @@ def cmd_skill(args):
     print(f"linked {target} → {src}")
 
 
+def cmd_setup(args):
+    from tracebook import setup
+    res = setup.setup(args.agent)
+    _out(args, [{"agent": a, "path": str(p), "result": r} for a, p, r in res],
+         "\n".join(f"{'✓' if r in ('installed', 'updated') else '·'} {a:<22} {r}  {p if r in ('installed', 'updated') else ''}".rstrip()
+                   for a, p, r in res) + "\nnext: `tracebook init analysis`, put files in analysis/data/, then ask your agent")
+    return 0 if any(r in ("installed", "updated") for _, _, r in res) else 1
+
+
+def cmd_doctor(args):
+    from tracebook import setup
+    rows = setup.doctor()
+    _out(args, dict(rows), "\n".join(f"{k:<22} {v}" for k, v in rows))
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tracebook", description=__doc__)
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    from tracebook.setup import tb_version
+    ap.add_argument("--version", action="version", version=f"tracebook {tb_version()}")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("init", help="create a project")
     s.add_argument("dir")
@@ -445,6 +462,11 @@ def main(argv=None) -> int:
     s = sub.add_parser("components", help="chart types, variants and fields the viewer can render")
     s.add_argument("type", nargs="*")
     s.set_defaults(fn=cmd_components)
+    s = sub.add_parser("setup", help="install the agent skill into every coding agent found (Claude Code, Codex, pi, OpenCode)")
+    s.add_argument("--agent", action="append", help="only this agent (repeatable), installed even if not detected")
+    s.set_defaults(fn=cmd_setup)
+    s = sub.add_parser("doctor", help="versions, viewer bundle and where the agent skill is installed")
+    s.set_defaults(fn=cmd_doctor)
     s = sub.add_parser("skill", help="install the agent skill (Claude Code: ~/.claude/skills)")
     s.add_argument("action", choices=["install", "path", "guide"])
     s.add_argument("name", nargs="?", help="pack name for `guide`")

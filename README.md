@@ -11,9 +11,10 @@ Full-resolution video: [docs/tracebook_demo.mp4](docs/tracebook_demo.mp4). Repor
 
 ## Install
 ```bash
-uv tool install .            # tracebook CLI
-tracebook skill install      # agent skill → ~/.claude/skills/tracebook
+npm i -g tracebook-cli       # or without installing: npx tracebook-cli <command>
+tracebook setup              # adds the skill to Claude Code, Codex, pi, OpenCode (whichever are installed)
 ```
+First run installs [uv](https://docs.astral.sh/uv/) if missing (it provides Python). From a checkout: `uv tool install .`. Release: bump `version` in `pyproject.toml` and `npm/package.json`, push a `vX.Y.Z` tag; CI publishes to npm.
 
 ## User flow
 1. **Start.** `tracebook init analysis`, drop your files in `data/`, `tracebook import data/*`. Import is typed: an ambiguous date or mixed column stops with the fix to apply instead of loading wrong values.
