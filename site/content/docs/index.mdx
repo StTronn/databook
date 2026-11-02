@@ -1,0 +1,81 @@
+---
+title: tracebook
+navTitle: Introduction
+description: Agent-native data notebook. Your coding agent answers data questions in SQL, Python and .xlsx-model blocks on DuckDB; every number traces to the block that computed it.
+---
+
+Agent-native data notebook. Your coding agent answers data questions in SQL, Python and .xlsx-model blocks on DuckDB; every number traces to the block that computed it.
+
+<Install />
+
+Then ask your agent a question about your data files. It builds the notebook and runs `tracebook check` until it is clean.
+
+<video src="/tracebook_demo.mp4" poster="/notebook-view.png" autoPlay muted loop playsInline controls className="rounded-lg border" />
+
+## Features
+
+- **Traceable numbers:** prose cites results as `{{block.col}}`, never typed-in values. Click any number in the viewer to see the query and rows behind it.
+- **Three compute languages:** SQL and Python blocks over one DuckDB database, plus `sheet` blocks that run an `.xlsx` model with inputs wired from other blocks.
+- **Checked:** `tracebook check` runs every block and reports broken SQL, missing columns, bad refs, type problems and typed-in numbers at `file:line`.
+- **Typed import:** CSV, Excel, JSON, SQLite, Parquet. Ambiguous dates or mixed types stop the import with the fix to apply, instead of loading wrong values.
+- **Review loop:** leave comments in the viewer; the agent reads `tracebook comments`, fixes, and resolves each with a note.
+- **Rerun on new data:** import the new export, `tracebook check`, then `tracebook diff` lists which blocks and numbers moved.
+- **Shareable:** `tracebook export` writes one self-contained HTML report; `--block` writes one result as CSV.
+
+## Works with
+
+Claude Code, OpenAI Codex, Cursor, OpenCode, pi: `tracebook setup` installs the [skill](/installation) for each. Any other agent that can run shell commands can use the CLI directly.
+
+## Docs for agents
+
+Every page is also Markdown, so an agent can read these docs directly:
+
+- `/agents.md`: what tracebook is, install, workflow rules, where to read next. Also served for `/` with `Accept: text/markdown`.
+- `/llms.txt`: all pages in one file. `/sitemap.md`: page index with summaries.
+- `<page>.md` (e.g. `/cli.md`), or any page with `Accept: text/markdown`. Known AI agents get Markdown automatically.
+
+## Example
+
+```bash
+tracebook init shop --template razorpay-funnel --demo
+cd shop && tracebook import data/*
+# imported 4 table(s) (timezone Asia/Kolkata)
+# table     source              rows  cols  files
+# orders    razorpay.orders    1,240    11  data/orders.xlsx
+# payments  razorpay.payments  1,072    25  data/payments.xlsx
+# ...
+tracebook check
+# ✓ 18 block(s), 0 error(s), 0 warning(s)
+tracebook dev          # viewer on http://localhost:4321
+tracebook export       # dist/index.html
+```
+
+A notebook is markdown. The agent writes blocks; the prose references their results:
+
+````md
+```sql funnel "Funnel counts"
+SELECT count(*) AS created,
+       count(*) FILTER (WHERE status = 'paid') AS paid,
+       paid / created AS conv
+FROM orders
+```
+
+Paid conversion was **{{funnel.conv | pct}}**.
+````
+
+## Why blocks and refs?
+
+An answer from a chat is a number you have to trust. In a notebook every number is a result of a named block:
+
+- **Checkable:** `check` fails on a ref to a missing block or column, and on a computed number typed into prose (`LITERAL_NUMBER_IN_PROSE`).
+- **Reviewable:** the query behind each figure is one click away, and comments attach to blocks.
+- **Repeatable:** the same notebook reruns on next month's export; nothing is copied by hand.
+
+## Architecture
+
+- **CLI** (Python, shipped via npm): import, schema, query, check, export. Output is compact text for agents; `--json` for machines.
+- **Engine:** one DuckDB database per workspace in `.tracebook/`; blocks run in dependency order, each result becomes a table named by the block id.
+- **Viewer** (React): `tracebook dev` serves it live; `tracebook export` inlines it into a single HTML file.
+- **Skill:** `SKILL.md` + block reference that teach the agent the workflow.
+
+![Notebook view](/notebook-view.png)

@@ -1,0 +1,78 @@
+---
+title: Quickstart
+description: From raw files to a checked, shareable report.
+---
+
+From raw files to a checked, shareable report.
+
+The agent normally runs every command below itself; you ask the question and review. They are listed so you know what it does.
+
+<Steps>
+<Step>
+
+### Create a workspace
+
+```bash
+tracebook init analysis --tz Europe/London
+```
+
+Creates `data/` (raw files, never modified), `notebooks/` and `.tracebook/`. `--tz` is the IANA zone used for local timestamps and date buckets (default `UTC`). `--template razorpay-funnel --demo` starts from a template with synthetic data.
+
+</Step>
+<Step>
+
+### Import data
+
+```bash
+cp ~/Downloads/*.csv analysis/data/ && cd analysis
+tracebook import data/*
+```
+
+CSV, Excel, JSON, SQLite and Parquet. Import is typed: an ambiguous date or mixed column stops that table with a `✗` line naming the fix, e.g. `--types order_date=date:dmy`. Live databases need no import; see [Database sources](/concepts/sources).
+
+</Step>
+<Step>
+
+### Ask the agent
+
+> where do customers drop off in checkout?
+
+With the skill installed, the agent reads `tracebook schema`, samples with `tracebook query`, writes `notebooks/<name>.md` (blocks, KPIs, charts, prose with `{{block.col}}` refs) and runs:
+
+</Step>
+<Step>
+
+### Check
+
+```bash
+tracebook check
+# ✓ 18 block(s), 0 error(s), 0 warning(s)
+```
+
+Exit 1 with `file:line` diagnostics until it is clean. The agent does not report done before `0 error(s)`.
+
+</Step>
+<Step>
+
+### Review
+
+```bash
+tracebook dev --open    # http://localhost:4321
+```
+
+Click a number to see its block. Toggle Notebook / Report view and the Terminal / Enterprise theme in the header. Leave comments; the agent picks them up with `tracebook comments`.
+
+</Step>
+<Step>
+
+### Export
+
+```bash
+tracebook export                          # dist/index.html, self-contained
+tracebook export --block funnel out.csv   # one block's full result
+```
+
+`export` refuses while errors remain (`--force` overrides).
+
+</Step>
+</Steps>

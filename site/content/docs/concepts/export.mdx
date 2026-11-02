@@ -1,0 +1,27 @@
+---
+title: Viewer & export
+description: Live preview while working, one HTML file to share.
+---
+
+Live preview while working, one HTML file to share.
+
+## Viewer
+
+```bash
+tracebook dev [--port 4321] [--open]
+```
+
+- **Notebook view:** everything, code included. **Report view:** results only.
+- Click any number to see the block and rows behind it.
+- **Themes:** Terminal (default) and Enterprise, switched from the header.
+- Comments: see [Comments, diff & rerun](/concepts/review).
+
+## Export
+
+```bash
+tracebook export [out]                 # default dist/index.html
+tracebook export --block <id> out.csv  # one compute block's full result
+tracebook export --nb growth/cohorts
+```
+
+The HTML is self-contained and holds block results only, not raw tables. Export refuses while `check` has errors; `--force` overrides. An answer file requested from the agent comes from a block via `--block`, never a side script.

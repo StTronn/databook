@@ -1,0 +1,33 @@
+---
+title: Workspace
+description: One folder holds raw data, notebooks, models and the database.
+---
+
+One folder holds raw data, notebooks, models and the database.
+
+```text
+analysis/
+  data/          raw files; import reads them, nothing writes them
+  notebooks/     **/<name>.md — the notebooks (you and the agent edit these)
+  models/        .xlsx models used by sheet blocks (optional)
+  dist/          export output
+  .tracebook/    DuckDB database, run history, comments — never edit
+```
+
+- `tracebook init <dir>` creates it; commands find the workspace from the current directory.
+- Imported tables are shared by all notebooks. Block ids are per notebook.
+- `tracebook new growth/cohorts` adds `notebooks/growth/cohorts.md`. With several notebooks, pass `--nb <name>` to `check`, `snapshot`, `diff`, `export`, `schema`, `query`, `comments`.
+- The project time zone (`--tz`) applies to `date_trunc` and `::DATE` on `TIMESTAMPTZ` columns.
+
+## Notebook file
+
+Markdown with optional frontmatter (`title`, `description`), fenced blocks and prose. Order in the file is presentation only; blocks run in dependency order.
+
+```md
+---
+title: Monthly business review — August 2018
+---
+# Monthly business review — August 2018
+
+## Revenue
+```

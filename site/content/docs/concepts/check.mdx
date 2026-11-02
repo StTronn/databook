@@ -1,0 +1,32 @@
+---
+title: Check & diagnostics
+description: tracebook check runs every block and validates the notebook.
+---
+
+tracebook check runs every block and validates the notebook.
+
+```bash
+tracebook check            # all notebooks; exit 0 = clean, 1 = errors
+tracebook check --nb growth/cohorts
+tracebook snapshot         # each block's status, rows and columns
+tracebook --json check     # machine-readable
+```
+
+Each problem is one line with a code and `file:line`. The agent fixes and reruns until `✓ … 0 error(s)`; `export` refuses otherwise.
+
+| Area | Codes |
+|---|---|
+| Structure | `MISSING_ID` `DUPLICATE_ID` `UNCLOSED_FENCE` `BAD_FENCE` `BAD_SPEC` `BAD_FRONTMATTER` `CYCLE` |
+| Refs | `REF_UNKNOWN` `INTERP_MULTIROW` `LITERAL_NUMBER_IN_PROSE` |
+| SQL / Python | `SQL_ERROR` `PY_ERROR` `PY_NOT_DATAFRAME` `PY_BAD_COLUMNS` |
+| Sheet | `SHEET_FILE_MISSING` `SHEET_INPUT_IS_FORMULA` `SHEET_FORMULA_ERROR` `SHEET_UNSUPPORTED_FN` |
+| Chart | `CHART_COLUMN_MISSING` `CHART_DUPLICATE_X` `CHART_NOT_NUMERIC` `CHART_NEGATIVE` `CHART_NEEDS_ONE_ROW` `CHART_BAND_ORDER` |
+| Warnings | `PII_COLUMN_PUBLISHED` `CHART_TRUNCATED` |
+
+## Import types
+
+Import errors (`AMBIGUOUS_DATE`, `TYPE_MISMATCH`) load nothing for that table. Rerun with `--types col=<type>`:
+
+`text` `int` `bool` `money` `decimal:N` `json` `timestamp` `date:dmy` `date:mdy` `local:dmy` (naive local time → `TIMESTAMPTZ`) `unix` (epoch seconds → `TIMESTAMPTZ`)
+
+Money columns are exact `DECIMAL`.

@@ -1,0 +1,37 @@
+---
+title: Examples
+description: Example workspaces in the repo. The Olist and online-retail notebooks were built by Claude Code with the tracebook skill.
+---
+
+Example workspaces in the repo. The Olist and online-retail notebooks were built by Claude Code with the tracebook skill.
+
+Each example is a workspace in [`examples/`](https://github.com/StTronn/tracebook/tree/main/examples). Clone the repo, add the data where noted, then run the commands from the example folder.
+
+## Olist marketplace
+
+[`examples/olist`](https://github.com/StTronn/tracebook/tree/main/examples/olist): Brazilian e-commerce data (CC BY-NC-SA 4.0), Spider2's `E_commerce.sqlite` placed as `data/olist.sqlite` (fetched by `evals/adapters/spider2-lite/fetch.sh`).
+
+- `monthly-review.md`: monthly business review for August 2018 vs July 2018 and August 2017: revenue, orders, customers, AOV, all in R$.
+- `channel-economics.md`: which marketing channels bring sellers who actually sell, and what each costs; editable assumptions (cost per lead, commission rate) at the top.
+
+```bash
+tracebook init . --tz America/Sao_Paulo && tracebook import data/olist.sqlite && tracebook check
+```
+
+## Online retail
+
+[`examples/online-retail`](https://github.com/StTronn/tracebook/tree/main/examples/online-retail): [UCI Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii) (CC BY 4.0). `customer-insights.md`: sales trend, revenue sources, repeat customers, most valuable customers, cost of cancellations, Dec 2009 – Dec 2011, in £.
+
+```bash
+tracebook init . --tz Europe/London && tracebook import data/* && tracebook check
+```
+
+## Razorpay demo
+
+[`examples/razorpay-demo`](https://github.com/StTronn/tracebook/tree/main/examples/razorpay-demo): demo Razorpay dashboard exports, recognised by the Razorpay source pack. Notebooks: `checkout-funnel.md` (order → payment → settlement, with an `.xlsx` what-if model), `finance/refunds.md`, `growth/weekly-orders.md`.
+
+```bash
+tracebook import data/*.xlsx && tracebook check
+```
+
+Start a fresh one from the same template: `tracebook init shop --template razorpay-funnel --demo`.

@@ -1,0 +1,42 @@
+---
+title: Installation
+description: One npm package for the CLI, then one command to give every coding agent the skill.
+---
+
+One npm package for the CLI, then one command to give every coding agent the skill.
+
+<Install />
+
+Needs Node.js (for `npm`/`npx`). On first run the launcher installs [uv](https://docs.astral.sh/uv/), and through it Python, if they are missing.
+
+## Connect your agents
+
+<Install variant="setup" />
+
+`tracebook setup` detects Claude Code, OpenAI Codex, OpenCode and pi and copies the skill (`SKILL.md` + `references/blocks.md`) into each, plus the shared `~/.agents/skills`. Rerun it after adding an agent; `tracebook doctor` lists what is wired.
+
+Where each agent reads skills, from its docs (checked 2026-11-02):
+
+| Agent | User skill dirs | Docs |
+|---|---|---|
+| Claude Code | `~/.claude/skills` | [skills](https://code.claude.com/docs/en/skills) |
+| OpenAI Codex | `~/.agents/skills` | [skills](https://learn.chatgpt.com/docs/build-skills) |
+| Cursor | `~/.cursor/skills`, `~/.agents/skills`, `~/.claude/skills` | [skills](https://cursor.com/docs/context/skills) |
+| OpenCode | `~/.config/opencode/skills`, `~/.claude/skills`, `~/.agents/skills` | [skills](https://opencode.ai/docs/skills/) |
+| pi | `~/.pi/agent/skills`, `~/.agents/skills` | [skills](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md) |
+
+Cursor is not detected separately; it reads `~/.agents/skills` and `~/.claude/skills`, which `setup` fills.
+
+<Callout>
+Only the Claude Code setup is exercised by Tracebook's own evals. For the other agents the directories are documented but not yet tested end to end.
+</Callout>
+
+## Without the skill
+
+Any agent that can run shell commands can use the CLI. Tell it to run `tracebook --help`, or point it at these docs: `/agents.md` (start here), `/llms.txt` (everything), `<page>.md` for one page.
+
+## Update
+
+<Install variant="upgrade" />
+
+`setup` again refreshes the copied skill.

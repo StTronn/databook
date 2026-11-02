@@ -1,0 +1,36 @@
+---
+title: Comments, diff & rerun
+description: The review loop between you and the agent, and rerunning on new data.
+---
+
+The review loop between you and the agent, and rerunning on new data.
+
+## Comments
+
+1. In `tracebook dev`, leave a comment on a block: "count per user, not per session".
+2. On its next turn the agent runs `tracebook comments`, changes the notebook, then:
+
+```bash
+tracebook comments resolve 3 --note 'counts distinct user_id now'
+tracebook comments --all     # include resolved
+```
+
+The note is shown to you in the viewer. Comments live in `.tracebook/comments.json`.
+
+## Diff
+
+```bash
+tracebook diff
+```
+
+Lists per-block changes between the last two runs with a different notebook or data: which blocks and numbers moved. The agent uses it to tell you what changed after an edit.
+
+## Rerun on new data
+
+```bash
+tracebook import data/payments_nov.xlsx
+tracebook check
+tracebook diff
+```
+
+The notebook is the same file; only the data changed.

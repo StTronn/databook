@@ -1,0 +1,78 @@
+---
+title: Blocks
+description: Compute blocks produce tables; display blocks and prose read them.
+---
+
+Compute blocks produce tables; display blocks and prose read them.
+
+| Block | Header | Body | Produces |
+|---|---|---|---|
+| `sql` | ` ```sql <id> "Title" ` | one query (SELECT / WITH / FROM / VALUES / PIVOT); reads imported tables and other blocks | table `<id>` |
+| `python` | ` ```python <id> ` | function body; tables/blocks it names are DataFrames; `pd`, `Decimal`, `TZ` predefined; must `return` a DataFrame (or `{name: DataFrame}` → `<id>__<name>`) | table `<id>` |
+| `sheet` | ` ```sheet <id> ` | YAML `file`, `inputs`, `outputs`, `show` | 1-row table of outputs + rendered range |
+| `kpi` | ` ```kpi ` | YAML list of `{label, value: block.col, format?, compare?: block.col}` | cards; pct deltas in pp |
+| `chart` | ` ```chart ` | YAML `{type, data, x, y, variant?, format?, title?, description?}` | chart with Chart/Table tabs (≤1000 rows) |
+| `table` | ` ```table ` | YAML `{data, columns?, sort?, limit?, format?}` | table |
+
+Ids are unique per notebook and must not equal an imported table name. Renaming or deleting a block drops its table on the next run.
+
+## sql
+
+````md
+```sql funnel "Funnel counts"
+SELECT count(*) AS created,
+       count(*) FILTER (WHERE status = 'paid') AS paid,
+       paid / created AS conv
+FROM orders
+```
+````
+
+## python
+
+Deterministic (seed any randomness), no network. Money columns arrive as `Decimal`.
+
+````md
+```python weekly
+o = orders.copy(); o["day"] = o.created_at.dt.tz_convert(TZ).dt.date
+return o.groupby("day").size().rename("orders").reset_index()
+```
+````
+
+## sheet
+
+Runs an `.xlsx` model: writes inputs into a copy, recalculates, reads outputs. Inputs must be constant cells. Inspect a model with `tracebook sheet <file>`; compare edits with `tracebook sheet <file> --diff <old>` (flags removed formulas).
+
+````md
+```sheet whatif
+file: models/whatif.xlsx
+inputs: { Inputs!B2: funnel.created }
+outputs: { Model!B7: uplift }
+show: Model!A1:B7
+```
+````
+
+## kpi, chart, table
+
+````md
+```kpi
+- { label: Conversion, value: funnel.conv, format: pct, compare: funnel_prev.conv }
+```
+
+```chart
+{ type: line, data: weekly, x: week, y: conversion, format: pct }
+```
+
+```table
+{ data: methods, columns: [method, success_rate], sort: lost_inr desc, format: { success_rate: pct } }
+```
+````
+
+Chart types: `bar`, `line`, `area`, `pie`, `funnel`, `radial`, `combo`. `tracebook components` lists variants and fields.
+
+## Prose refs
+
+```md
+Paid conversion was **{{funnel.conv | pct}}**.
+```
+
+`{{block.col | format}}`, kpi `value` and sheet `inputs` need a block that returns exactly one row (`INTERP_MULTIROW` otherwise). Formats: `int num pct inr inr_short usd usd_short gbp gbp_short date text`.
