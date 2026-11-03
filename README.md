@@ -9,6 +9,8 @@ Agent-native data notebook. You ask your coding agent a question about your data
 
 Full-resolution video: [docs/databook_demo.mp4](docs/databook_demo.mp4). Report view of the same notebook.
 
+Docs: **https://databook-xi.vercel.app** · npm: [`databook-cli`](https://www.npmjs.com/package/databook-cli)
+
 ## Install
 ```bash
 npm i -g databook-cli       # or without installing: npx databook-cli <command>
