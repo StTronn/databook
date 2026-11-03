@@ -4,7 +4,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.formula import ArrayFormula
 
 from conftest import block, results
-from tracebook.cli import main
+from databook.cli import main
 
 
 def _model(path, **cells):

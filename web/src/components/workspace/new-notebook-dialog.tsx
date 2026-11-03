@@ -12,7 +12,7 @@ const ROOT = ":root"
 const NEW = ":new"
 const BLANK = ":blank"
 
-// Mirrors tracebook/project.py (KEY, schema_for) so bad names never reach the server; it still re-validates.
+// Mirrors databook/project.py (KEY, schema_for) so bad names never reach the server; it still re-validates.
 const KEY = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/
 const schemaFor = (key: string) => "nb_" + key.toLowerCase().replace(/[^a-z0-9]+/g, "_")
 

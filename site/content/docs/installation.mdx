@@ -13,7 +13,7 @@ Needs Node.js (for `npm`/`npx`). On first run the launcher installs [uv](https:/
 
 <Install variant="setup" />
 
-`tracebook setup` detects Claude Code, OpenAI Codex, OpenCode and pi and copies the skill (`SKILL.md` + `references/blocks.md`) into each, plus the shared `~/.agents/skills`. Rerun it after adding an agent; `tracebook doctor` lists what is wired.
+`databook setup` detects Claude Code, OpenAI Codex, OpenCode and pi and copies the skill (`SKILL.md` + `references/blocks.md`) into each, plus the shared `~/.agents/skills`. Rerun it after adding an agent; `databook doctor` lists what is wired.
 
 Where each agent reads skills, from its docs (checked 2026-11-02):
 
@@ -28,12 +28,12 @@ Where each agent reads skills, from its docs (checked 2026-11-02):
 Cursor is not detected separately; it reads `~/.agents/skills` and `~/.claude/skills`, which `setup` fills.
 
 <Callout>
-Only the Claude Code setup is exercised by Tracebook's own evals. For the other agents the directories are documented but not yet tested end to end.
+Only the Claude Code setup is exercised by Databook's own evals. For the other agents the directories are documented but not yet tested end to end.
 </Callout>
 
 ## Without the skill
 
-Any agent that can run shell commands can use the CLI. Tell it to run `tracebook --help`, or point it at these docs: `/agents.md` (start here), `/llms.txt` (everything), `<page>.md` for one page.
+Any agent that can run shell commands can use the CLI. Tell it to run `databook --help`, or point it at these docs: `/agents.md` (start here), `/llms.txt` (everything), `<page>.md` for one page.
 
 ## Update
 

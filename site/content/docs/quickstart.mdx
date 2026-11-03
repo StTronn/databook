@@ -13,10 +13,10 @@ The agent normally runs every command below itself; you ask the question and rev
 ### Create a workspace
 
 ```bash
-tracebook init analysis --tz Europe/London
+databook init analysis --tz Europe/London
 ```
 
-Creates `data/` (raw files, never modified), `notebooks/` and `.tracebook/`. `--tz` is the IANA zone used for local timestamps and date buckets (default `UTC`). `--template razorpay-funnel --demo` starts from a template with synthetic data.
+Creates `data/` (raw files, never modified), `notebooks/` and `.databook/`. `--tz` is the IANA zone used for local timestamps and date buckets (default `UTC`). `--template razorpay-funnel --demo` starts from a template with synthetic data.
 
 </Step>
 <Step>
@@ -25,7 +25,7 @@ Creates `data/` (raw files, never modified), `notebooks/` and `.tracebook/`. `--
 
 ```bash
 cp ~/Downloads/*.csv analysis/data/ && cd analysis
-tracebook import data/*
+databook import data/*
 ```
 
 CSV, Excel, JSON, SQLite and Parquet. Import is typed: an ambiguous date or mixed column stops that table with a `✗` line naming the fix, e.g. `--types order_date=date:dmy`. Live databases need no import; see [Database sources](/concepts/sources).
@@ -37,7 +37,7 @@ CSV, Excel, JSON, SQLite and Parquet. Import is typed: an ambiguous date or mixe
 
 > where do customers drop off in checkout?
 
-With the skill installed, the agent reads `tracebook schema`, samples with `tracebook query`, writes `notebooks/<name>.md` (blocks, KPIs, charts, prose with `{{block.col}}` refs) and runs:
+With the skill installed, the agent reads `databook schema`, samples with `databook query`, writes `notebooks/<name>.md` (blocks, KPIs, charts, prose with `{{block.col}}` refs) and runs:
 
 </Step>
 <Step>
@@ -45,7 +45,7 @@ With the skill installed, the agent reads `tracebook schema`, samples with `trac
 ### Check
 
 ```bash
-tracebook check
+databook check
 # ✓ 18 block(s), 0 error(s), 0 warning(s)
 ```
 
@@ -57,10 +57,10 @@ Exit 1 with `file:line` diagnostics until it is clean. The agent does not report
 ### Review
 
 ```bash
-tracebook dev --open    # http://localhost:4321
+databook dev --open    # http://localhost:4321
 ```
 
-Click a number to see its block. Toggle Notebook / Report view and the Terminal / Enterprise theme in the header. Leave comments; the agent picks them up with `tracebook comments`.
+Click a number to see its block. Toggle Notebook / Report view and the Terminal / Enterprise theme in the header. Leave comments; the agent picks them up with `databook comments`.
 
 </Step>
 <Step>
@@ -68,8 +68,8 @@ Click a number to see its block. Toggle Notebook / Report view and the Terminal 
 ### Export
 
 ```bash
-tracebook export                          # dist/index.html, self-contained
-tracebook export --block funnel out.csv   # one block's full result
+databook export                          # dist/index.html, self-contained
+databook export --block funnel out.csv   # one block's full result
 ```
 
 `export` refuses while errors remain (`--force` overrides).

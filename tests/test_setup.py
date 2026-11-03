@@ -1,8 +1,8 @@
-"""`tracebook setup` / `doctor`: copies the skill into detected agents, updates its own copies, never touches yours."""
+"""`databook setup` / `doctor`: copies the skill into detected agents, updates its own copies, never touches yours."""
 import json
 
-from tracebook.cli import main
-from tracebook import setup
+from databook.cli import main
+from databook import setup
 
 
 def _home(tmp_path, monkeypatch, *dirs):
@@ -20,7 +20,7 @@ def test_setup_installs_into_detected_agents_and_shared_dir(tmp_path, monkeypatc
     assert res == {"Claude Code": "installed", "Codex": "not found, skipped", "pi": "installed",
                    "OpenCode": "not found, skipped", "Agent Skills (shared)": "installed"}
     for d in (".claude/skills", ".pi/agent/skills", ".agents/skills"):
-        sk = h / d / "tracebook"
+        sk = h / d / "databook"
         assert (sk / "SKILL.md").read_text() == (setup.SKILL / "SKILL.md").read_text()
         assert (sk / setup.MARKER).read_text().strip() == setup.tb_version()
     assert not (h / ".codex").exists()
@@ -29,17 +29,17 @@ def test_setup_installs_into_detected_agents_and_shared_dir(tmp_path, monkeypatc
 def test_setup_updates_own_copy_and_old_symlink_but_never_a_user_skill(tmp_path, monkeypatch, capsys):
     h = _home(tmp_path, monkeypatch, ".claude", ".pi")
     main(["setup"])
-    (h / ".claude/skills/tracebook/SKILL.md").write_text("stale")                     # our copy, outdated
-    mine = h / ".pi/agent/skills/tracebook"
+    (h / ".claude/skills/databook/SKILL.md").write_text("stale")                     # our copy, outdated
+    mine = h / ".pi/agent/skills/databook"
     (mine / setup.MARKER).unlink(); (mine / "SKILL.md").write_text("my own skill")    # user-made dir
-    shared = h / ".agents/skills/tracebook"
+    shared = h / ".agents/skills/databook"
     import shutil; shutil.rmtree(shared); shared.symlink_to(tmp_path)                  # old `skill install` link
     capsys.readouterr()
     assert main(["--json", "setup"]) == 0
     res = {r["agent"]: r["result"] for r in json.loads(capsys.readouterr().out)}
     assert res["Claude Code"] == "updated" and res["Agent Skills (shared)"] == "updated"
     assert res["pi"].startswith("skipped")
-    assert (h / ".claude/skills/tracebook/SKILL.md").read_text() != "stale"
+    assert (h / ".claude/skills/databook/SKILL.md").read_text() != "stale"
     assert (mine / "SKILL.md").read_text() == "my own skill"
     assert not shared.is_symlink() and (shared / "SKILL.md").exists()
 
@@ -47,7 +47,7 @@ def test_setup_updates_own_copy_and_old_symlink_but_never_a_user_skill(tmp_path,
 def test_setup_named_agent_installs_even_if_not_detected(tmp_path, monkeypatch, capsys):
     h = _home(tmp_path, monkeypatch)
     assert main(["setup", "--agent", "opencode"]) == 0
-    assert (h / ".config/opencode/skills/tracebook/SKILL.md").exists()
+    assert (h / ".config/opencode/skills/databook/SKILL.md").exists()
     assert not (h / ".agents").exists()                                              # only the named one
 
 
@@ -62,4 +62,18 @@ def test_doctor_and_version(tmp_path, monkeypatch, capsys):
         main(["--version"])
     except SystemExit as e:
         assert e.code == 0
-    assert capsys.readouterr().out.strip() == f"tracebook {setup.tb_version()}"
+    assert capsys.readouterr().out.strip() == f"databook {setup.tb_version()}"
+
+
+def test_setup_removes_pre_rename_skill_copies_but_not_user_dirs(tmp_path, monkeypatch, capsys):
+    h = _home(tmp_path, monkeypatch, ".claude", ".pi")
+    old_copy = h / ".claude/skills" / setup.LEGACY[0]
+    old_copy.mkdir(parents=True); (old_copy / setup.LEGACY[1]).write_text("0.1.0")
+    old_link = h / ".agents/skills" / setup.LEGACY[0]
+    old_link.parent.mkdir(parents=True); old_link.symlink_to(tmp_path / "gone")          # dangling repo-path link
+    user_dir = h / ".pi/agent/skills" / setup.LEGACY[0]
+    user_dir.mkdir(parents=True); (user_dir / "SKILL.md").write_text("mine")              # no marker: user's own
+    assert main(["setup"]) == 0
+    assert not old_copy.exists() and not old_link.is_symlink()
+    assert (user_dir / "SKILL.md").read_text() == "mine"
+    assert (h / ".claude/skills/databook/SKILL.md").exists()

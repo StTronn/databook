@@ -1,4 +1,4 @@
-# Setup CC+P: Claude Code + the data-analysis playbook (skill). Only agents[].skills and the tracebook mounts may differ across cc*.yaml.
+# Setup CC+P: Claude Code + the data-analysis playbook (skill). Only agents[].skills and the databook mounts may differ across cc*.yaml.
 #   evals/run.sh evals/configs/cc-p.yaml      (key in evals/.env; add --install-only to test setup without model calls)
 job_name: cc-p
 jobs_dir: evals/jobs

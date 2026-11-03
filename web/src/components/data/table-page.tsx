@@ -208,7 +208,7 @@ export function TablePage({ table, onOpenBlock }: TablePageProps) {
   if (!live)
     return (
       <p className="p-6 text-xs text-muted-foreground">
-        The data browser is available in <code className="text-foreground">tracebook dev</code>.
+        The data browser is available in <code className="text-foreground">databook dev</code>.
       </p>
     )
   return (

@@ -1,4 +1,4 @@
-# Setup CC: plain Claude Code. Only agents[].skills and the tracebook mounts may differ across cc*.yaml.
+# Setup CC: plain Claude Code. Only agents[].skills and the databook mounts may differ across cc*.yaml.
 #   evals/run.sh evals/configs/cc.yaml      (key in evals/.env; add --install-only to test setup without model calls)
 job_name: cc
 jobs_dir: evals/jobs

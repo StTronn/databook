@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from conftest import FIX
-from tracebook.cli import main
-from tracebook.ingest import types as T
+from databook.cli import main
+from databook.ingest import types as T
 
 IST = ZoneInfo("Asia/Kolkata")
 

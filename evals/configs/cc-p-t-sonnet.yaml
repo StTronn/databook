@@ -1,4 +1,4 @@
-# Setup CC+P+T on Sonnet. Only agents[].skills and the tracebook mounts may differ across cc*.yaml (model also differs from cc-p-t.yaml).
+# Setup CC+P+T on Sonnet. Only agents[].skills and the databook mounts may differ across cc*.yaml (model also differs from cc-p-t.yaml).
 #   evals/run.sh evals/configs/cc-p-t-sonnet.yaml      (key in evals/.env; add --install-only to test setup without model calls)
 job_name: cc-p-t-sonnet
 jobs_dir: evals/jobs
@@ -11,9 +11,9 @@ tasks:
 environment:
   mounts:                  # host runtimes (evals/agents/prefetch.py, run by evals/run.sh), read-only; nothing installed per trial
     - {type: bind, source: "${EVALS_RT}/claude", target: /usr/local/bin/claude, read_only: true, bind: {create_host_path: false}}
-    - {type: bind, source: "${EVALS_RT}/tracebook", target: /opt/tracebook, read_only: true, bind: {create_host_path: false}}
-    - {type: bind, source: "${EVALS_DIR}/agents/tracebook.sh", target: /usr/local/bin/tracebook, read_only: true, bind: {create_host_path: false}}
-    - {type: bind, source: "${EVALS_DIR}/../src/tracebook/skill", target: /root/.claude/skills/tracebook, read_only: true, bind: {create_host_path: false}}
+    - {type: bind, source: "${EVALS_RT}/databook", target: /opt/databook, read_only: true, bind: {create_host_path: false}}
+    - {type: bind, source: "${EVALS_DIR}/agents/databook.sh", target: /usr/local/bin/databook, read_only: true, bind: {create_host_path: false}}
+    - {type: bind, source: "${EVALS_DIR}/../src/databook/skill", target: /root/.claude/skills/databook, read_only: true, bind: {create_host_path: false}}
     - {type: bind, source: "${EVALS_DIR}/agents/CLAUDE.md", target: /app/CLAUDE.md, read_only: true, bind: {create_host_path: false}}
 agents:
   - name: claude-code      # Harbor built-in; skips install since the mounted binary matches `version`

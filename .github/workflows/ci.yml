@@ -20,7 +20,7 @@ jobs:
       - run: npm ci && npm run build
         working-directory: web
       - name: committed viewer bundle matches web/ sources (run `cd web && npm run build` and commit)
-        run: git diff --exit-code --stat -- src/tracebook/viewer/index.html
+        run: git diff --exit-code --stat -- src/databook/viewer/index.html
   npm-package:
     runs-on: ubuntu-latest
     steps:
@@ -28,6 +28,6 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm pack && npm install -g ./tracebook-cli-*.tgz
+      - run: npm pack && npm install -g ./databook-cli-*.tgz
         working-directory: npm
-      - run: tracebook --version && tracebook doctor && tracebook init /tmp/ws && cd /tmp/ws && tracebook check
+      - run: databook --version && databook doctor && databook init /tmp/ws && cd /tmp/ws && databook check

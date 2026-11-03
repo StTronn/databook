@@ -1,4 +1,4 @@
-/* Tracebook viewer theme: smui (smui.statico.io, Nord-based terminal look) with a darker, near-black dark mode.
+/* Databook viewer theme: smui (smui.statico.io, Nord-based terminal look) with a darker, near-black dark mode.
    Every token is a plain CSS variable → a project theme.css (inlined into #tb-theme, after this CSS) can override any
    of them: `:root { --primary: … }` applies to both modes, `[data-theme="light"] { … }` to one mode. */
 @import "@fontsource-variable/jetbrains-mono";

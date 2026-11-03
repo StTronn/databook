@@ -1,9 +1,9 @@
-// Shape of .tracebook/results.json (written by tracebook/run.py). Keep in sync with run.py `_render` / `_chart`.
+// Shape of .databook/results.json (written by databook/run.py). Keep in sync with run.py `_render` / `_chart`.
 export type Diagnostic = { line: number; code: string; message: string; severity: "error" | "warning"; block?: string | null }
 export type Column = { name: string; type: string }
 // title: from ```sql id "Title" (null if absent); usedBy: ids of blocks that read this one
 // reads: imported tables this block reads (data browser "used by")
-// anchor: stable identity across runs (tracebook/core/anchors.py); comments attach to it, not to the id
+// anchor: stable identity across runs (databook/core/anchors.py); comments attach to it, not to the id
 type Base = { id: string; anchor?: string; line: number; deps: string[]; reads: string[]; usedBy: string[]; title?: string | null; error?: string }
 export type SheetCell = { a: string; v: unknown; f: string | null; fmt: string | null; d: string }
 export type ComputeBlock = Base & {
@@ -57,7 +57,7 @@ export type Doc = {
   diagnostics: Diagnostic[]
 }
 
-// ── dev-server workspace API (tracebook/src/tracebook/workspace.py). Not available in exported files. ──
+// ── dev-server workspace API (databook/src/databook/workspace.py). Not available in exported files. ──
 export type NotebookEntry = {
   key: string; path: string; title: string; ran: boolean; ok: boolean; errors: number; warnings: number; ranAt: string | null
 }
@@ -78,7 +78,7 @@ export type SchemaTable = {
 }
 export type Preview = { table: string; columns: Column[]; rows: unknown[][]; display: string[][]; rowCount: number | null; truncated: boolean }
 
-// Review comments (GET/POST /api/comments, dev only); the agent resolves them with `tracebook comments resolve`.
+// Review comments (GET/POST /api/comments, dev only); the agent resolves them with `databook comments resolve`.
 export type Comment = {
   id: number; notebook: string; path: string; block: string; line: number; text: string
   status: "open" | "resolved"; created: string; resolution: string | null; resolved: string | null

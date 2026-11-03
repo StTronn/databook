@@ -480,5 +480,5 @@ SELECT count(*) AS lines FROM items WHERE kind = 'stock_adjustment'
 - **Customers**: about a fifth of sales lines have no customer ID (guest checkout); they count in sales and country figures but not in retention or segments.
 - **Retention**: a customer's cohort is the month of their first order seen in this data. "Mth N" = share of the cohort who bought in the Nth month after it. Nov 2011 is the last full month; later months show blank. The Dec 2009 cohort includes customers who bought before the data starts.
 - **Segments** (RFM): each customer gets a 1–5 score for recency (days since last order, as of 10 Dec 2011), frequency (number of orders) and spend (net), by rank among all customers. Segments use the recency and frequency scores with the standard RFM segment map; customers whose purchases were all cancelled are listed separately.
-- **Win-back CSV**: `tracebook export --block winback winback.csv` writes every customer on the list (the table above shows the top 10).
+- **Win-back CSV**: `databook export --block winback winback.csv` writes every customer on the list (the table above shows the top 10).
 - The 12-month comparison uses Dec 2009–Nov 2010 vs Dec 2010–Nov 2011 so both periods are full and include one holiday season.

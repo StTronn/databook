@@ -5,7 +5,7 @@
 # and keep the "anthropic/" model prefix → 404.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-# host runtimes the configs bind-mount (Claude Code binary; tracebook for cc-p-t); docker compose expands these vars
+# host runtimes the configs bind-mount (Claude Code binary; databook for cc-p-t); docker compose expands these vars
 export EVALS_DIR="$PWD/evals" EVALS_RT="$PWD/evals/.cache/runtime"
 uv run -q python evals/agents/prefetch.py "$1"
 exec env -u ANTHROPIC_BASE_URL -u CLAUDE_CODE_OAUTH_SCOPES harbor run -c "$1" --env-file evals/.env "${@:2}"

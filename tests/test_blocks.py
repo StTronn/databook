@@ -4,8 +4,8 @@ from decimal import Decimal
 import pytest
 
 from conftest import block, results
-from tracebook.cli import main
-from tracebook.core.values import fmt
+from databook.cli import main
+from databook.core.values import fmt
 
 
 def _append(p, text):

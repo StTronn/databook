@@ -64,7 +64,7 @@ export function DataTree({ selected, onOpen }: DataTreeProps) {
         </div>
       ) : tables.length === 0 && Object.keys(sourceErrors).length === 0 ? (
         <p className="px-1 text-xs leading-relaxed text-muted-foreground">
-          No data imported. Run <code className="text-foreground">tracebook import data/*</code>
+          No data imported. Run <code className="text-foreground">databook import data/*</code>
         </p>
       ) : groups.length === 0 ? (
         <p className="px-1 text-xs text-muted-foreground">No tables or columns match “{q.trim()}”.</p>

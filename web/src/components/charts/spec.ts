@@ -1,5 +1,5 @@
-// Python's chart registry (tracebook/src/tracebook/components.json) is the single source of truth for types/variants.
-import spec from "../../../../src/tracebook/components.json"
+// Python's chart registry (databook/src/databook/components.json) is the single source of truth for types/variants.
+import spec from "../../../../src/databook/components.json"
 import type { ChartBlock } from "@/types"
 
 export type ChartSpec = typeof spec.chart

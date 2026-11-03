@@ -17,5 +17,5 @@ export const generateStaticParams = docsPage.generateStaticParams;
 export const generateMetadata: typeof docsPage.generateMetadata = async (props) => {
   const metadata = await docsPage.generateMetadata(props);
   const { slug } = await props.params;
-  return slug?.length ? metadata : { ...metadata, title: { absolute: "tracebook" } };
+  return slug?.length ? metadata : { ...metadata, title: { absolute: "databook" } };
 };

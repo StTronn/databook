@@ -1,4 +1,4 @@
-// prepack: build the tracebook wheel from the repo root into dist/ and pin its dependencies (uv.lock → constraints).
+// prepack: build the databook wheel from the repo root into dist/ and pin its dependencies (uv.lock → constraints).
 // Fails when package.json and pyproject.toml disagree on the version, so npm and the wheel always match.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -17,4 +17,4 @@ execFileSync("uv", ["build", "--wheel", "-q", "-o", dist], { cwd: root, stdio: "
 const cons = execFileSync("uv", ["export", "-q", "--frozen", "--no-dev", "--no-emit-project", "--no-hashes"], { cwd: root });
 writeFileSync(join(dist, "constraints.txt"), cons);
 rmSync(join(dist, ".gitignore"), { force: true });   // uv writes `*` here; npm would then drop the wheel
-console.log(`built tracebook ${py} wheel + constraints into npm/dist`);
+console.log(`built databook ${py} wheel + constraints into npm/dist`);

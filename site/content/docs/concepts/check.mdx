@@ -1,15 +1,15 @@
 ---
 title: Check & diagnostics
-description: tracebook check runs every block and validates the notebook.
+description: databook check runs every block and validates the notebook.
 ---
 
-tracebook check runs every block and validates the notebook.
+databook check runs every block and validates the notebook.
 
 ```bash
-tracebook check            # all notebooks; exit 0 = clean, 1 = errors
-tracebook check --nb growth/cohorts
-tracebook snapshot         # each block's status, rows and columns
-tracebook --json check     # machine-readable
+databook check            # all notebooks; exit 0 = clean, 1 = errors
+databook check --nb growth/cohorts
+databook snapshot         # each block's status, rows and columns
+databook --json check     # machine-readable
 ```
 
 Each problem is one line with a code and `file:line`. The agent fixes and reruns until `✓ … 0 error(s)`; `export` refuses otherwise.

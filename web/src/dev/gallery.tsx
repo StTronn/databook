@@ -1,4 +1,4 @@
-// Dev-only (vite serve /gallery.html): every chart block of the running `tracebook dev` + synthetic type×variant fixtures.
+// Dev-only (vite serve /gallery.html): every chart block of the running `databook dev` + synthetic type×variant fixtures.
 import { StrictMode, useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { ChartCard } from "@/components/charts/chart-card"

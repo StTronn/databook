@@ -7,7 +7,7 @@ __pycache__/
 dist/
 build/
 
-# web (viewer build output is committed at src/tracebook/viewer/, shipped in the wheel)
+# web (viewer build output is committed at src/databook/viewer/, shipped in the wheel)
 node_modules/
 *.tsbuildinfo
 
@@ -20,7 +20,7 @@ node_modules/
 .env
 .env.*
 
-# workspace state of the example workspaces (database, results, history) is rebuilt by `tracebook import` / `check`
-examples/*/.tracebook/
+# workspace state of the example workspaces (database, results, history) is rebuilt by `databook import` / `check`
+examples/*/.databook/
 examples/online-retail/data/
 examples/olist/data/

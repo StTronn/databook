@@ -10,10 +10,10 @@ import duckdb
 
 import pytest
 
-from tracebook import workspace
-from tracebook.cli import main
-from tracebook.packs import templates
-from tracebook.project import Project, ProjectError
+from databook import workspace
+from databook.cli import main
+from databook.packs import templates
+from databook.project import Project, ProjectError
 
 
 @pytest.fixture
@@ -152,7 +152,7 @@ def _req(url, data=None, headers=None):
 def test_dev_server_api_and_guards(ws):
     _nb(ws, "a", "```sql s\nSELECT 1 AS x\n```\n")
     port = _free_port()
-    proc = subprocess.Popen([sys.executable, "-m", "tracebook.cli", "dev", "--port", str(port)], cwd=ws.root,
+    proc = subprocess.Popen([sys.executable, "-m", "databook.cli", "dev", "--port", str(port)], cwd=ws.root,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     base = f"http://127.0.0.1:{port}"
     try:
@@ -229,7 +229,7 @@ def test_reading_a_missing_named_output(ws):
 
 
 def test_comments_flow(ws, capsys):
-    from tracebook import comments
+    from databook import comments
     _nb(ws, "growth/a", "# A\n\n```sql s\nSELECT 1 AS x\n```\n")
     assert main(["check"]) == 0
     c = comments.add(ws, "growth/a", "s", "  use distinct orders  ")
@@ -253,7 +253,7 @@ def test_query_waits_for_a_running_writer(ws, capsys):
     assert main(["check"]) == 0
     held = threading.Event()
 
-    def writer():                          # what `tracebook check` / the dev server do while running a notebook
+    def writer():                          # what `databook check` / the dev server do while running a notebook
         with ws.lock():
             con = ws.connect(schema="nb_a")
             held.set()
@@ -270,7 +270,7 @@ def test_query_waits_for_a_running_writer(ws, capsys):
 
 
 def test_comment_follows_its_block_and_flags_deleted_ones(ws, capsys):
-    from tracebook import comments
+    from databook import comments
     _nb(ws, "a", "```sql s\nSELECT 1 AS x\n```\n")
     assert main(["check"]) == 0
     comments.add(ws, "a", "s", "check this")
@@ -288,7 +288,7 @@ def test_dev_server_reports_run_crash_only_for_that_notebook(ws):
     _nb(ws, "a", "```sql s\nSELECT 1 AS x\n```\n")
     _nb(ws, "b", "```sql s\nSELECT 2 AS x\n```\n")
     port = _free_port()
-    proc = subprocess.Popen([sys.executable, "-m", "tracebook.cli", "dev", "--port", str(port)], cwd=ws.root,
+    proc = subprocess.Popen([sys.executable, "-m", "databook.cli", "dev", "--port", str(port)], cwd=ws.root,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     base = f"http://127.0.0.1:{port}"
     try:
@@ -321,8 +321,8 @@ def test_dev_server_reports_run_crash_only_for_that_notebook(ws):
 
 
 def test_identical_rerun_gives_identical_results(ws):
-    from tracebook.history import summarize
-    from tracebook.run import run_notebook
+    from databook.history import summarize
+    from databook.run import run_notebook
     # parallel GROUP BY returns groups in a different order run to run unless the stored result is ordered
     _nb(ws, "a", "```sql g\nSELECT x % 997 AS k, count(*) AS n FROM range(300000) r(x) GROUP BY 1\n```\n\n"
                  "```sql top\nSELECT k FROM g ORDER BY n DESC, k DESC LIMIT 3\n```\n\n"
@@ -338,7 +338,7 @@ def test_identical_rerun_gives_identical_results(ws):
 
 
 def test_comment_stays_on_its_display_block(ws, capsys):
-    from tracebook import comments
+    from databook import comments
     s = "```sql s\nSELECT k, sum(v) AS v FROM t GROUP BY k\n```\n\n"
     chart = lambda title: f'```chart\n{{ type: bar, data: s, x: k, y: v, title: "{title}" }}\n```\n\n'
     _nb(ws, "a", s + chart("Revenue"))
@@ -358,7 +358,7 @@ def test_comment_stays_on_its_display_block(ws, capsys):
 
 
 def test_comment_on_prose_reports_what_changed(ws, capsys):
-    from tracebook import comments
+    from databook import comments
     _nb(ws, "b", "```sql n\nSELECT count(*) AS n FROM t\n```\n\nThere are {{n.n}} rows.\n")
     assert main(["check"]) == 0
     md = next(b["id"] for b in _res(ws, "b")["blocks"] if b["kind"] == "md")
@@ -435,7 +435,7 @@ def test_unknown_catalog_is_still_a_cross_notebook_ref(ws):
 
 
 def test_data_browser_lists_and_previews_source_tables(ws, monkeypatch):
-    from tracebook import workspace
+    from databook import workspace
     _source_db(ws.root / "shop.duckdb", [10, 20])
     assert main(["source", "add", "shop", "--type", "duckdb", "--path", "shop.duckdb"]) == 0
     _nb(ws, "a", "```sql s\nSELECT sum(amount) AS total FROM shop.sales.orders\n```\n")

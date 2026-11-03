@@ -5,8 +5,8 @@ cache, exported by evals/run.sh). Harbor's built-in claude-code agent finds the 
 evals/.cache/runtime/
   claude-<version>-linux-<arch>   Claude Code native Linux binary, sha256-checked against the release manifest (cache)
   claude                          hard link to the build for the config's version + Docker arch → /usr/local/bin/claude
-  tracebook/                      only if a mount uses it: tracebook + deps (pinned by uv.lock) for the task image's
-                                  python, `uv pip install --target` → /opt/tracebook (rebuilt every run: local code)
+  databook/                      only if a mount uses it: databook + deps (pinned by uv.lock) for the task image's
+                                  python, `uv pip install --target` → /opt/databook (rebuilt every run: local code)
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "evals/.cache/runtime"
 CLAUDE_BASE = "https://downloads.claude.ai/claude-code-releases"
-TASK_PYTHON = "3.12"            # python3 of the task image (ubuntu-24-04); a mismatch fails at `tracebook --help`
+TASK_PYTHON = "3.12"            # python3 of the task image (ubuntu-24-04); a mismatch fails at `databook --help`
 
 
 def docker_arch() -> str:
@@ -51,8 +51,8 @@ def claude(version: str, arch: str) -> None:
     os.link(out, link)  # hard link, not symlink: Docker Desktop bind mounts don't follow host symlinks reliably
 
 
-def tracebook(arch: str) -> None:
-    out, whl = CACHE / "tracebook", CACHE / "wheel"
+def databook(arch: str) -> None:
+    out, whl = CACHE / "databook", CACHE / "wheel"
     for d in (out, whl):
         shutil.rmtree(d, ignore_errors=True)
     run = lambda *a, **kw: subprocess.run(a, cwd=ROOT, check=True, **kw)
@@ -77,8 +77,8 @@ def main(config: str) -> None:
     CACHE.mkdir(parents=True, exist_ok=True)
     arch = docker_arch()
     claude(versions.pop(), arch)
-    if any("/tracebook" in m.get("source", "") for m in (cfg.get("environment") or {}).get("mounts") or []):
-        tracebook(arch)
+    if any("/databook" in m.get("source", "") for m in (cfg.get("environment") or {}).get("mounts") or []):
+        databook(arch)
 
 
 if __name__ == "__main__":

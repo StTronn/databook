@@ -1,6 +1,6 @@
 # Release: bump `version` in pyproject.toml and npm/package.json (same value), commit, then
 #   git tag v0.2.0 && git push origin v0.2.0
-# → tests, npm publish (tracebook-cli, with provenance), GitHub release with the wheel.
+# → tests, npm publish (databook-cli, with provenance), GitHub release with the wheel.
 # npm auth: repository secret NPM_TOKEN (npm automation token), or npm trusted publishing configured for this
 # workflow on npmjs.com (then no secret is needed).
 name: release

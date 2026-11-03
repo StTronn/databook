@@ -10,7 +10,7 @@ import { isSiteUrlConfigured, siteUrl } from "@/lib/geistdocs/site-url";
 
 export const metadata: Metadata = {
   metadataBase: isSiteUrlConfigured ? siteUrl : undefined,
-  title: { template: "%s · tracebook", default: "tracebook" },
+  title: { template: "%s · databook", default: "databook" },
   description:
     "Agent-native data notebook: your coding agent answers data questions in SQL, Python and .xlsx-model blocks on DuckDB, and every number traces to the block that computed it.",
 };

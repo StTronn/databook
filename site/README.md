@@ -1,4 +1,4 @@
-# tracebook docs
+# databook docs
 
 Docs + landing site, built with [Geistdocs](https://www.npmjs.com/package/@vercel/geistdocs) (Next.js + Fumadocs). Deployed on Vercel from this folder.
 

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from tracebook.cli import main
-from tracebook.project import Project
+from databook.cli import main
+from databook.project import Project
 
 FIX = Path(__file__).parent / "fixtures"
 

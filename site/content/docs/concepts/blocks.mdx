@@ -40,7 +40,7 @@ return o.groupby("day").size().rename("orders").reset_index()
 
 ## sheet
 
-Runs an `.xlsx` model: writes inputs into a copy, recalculates, reads outputs. Inputs must be constant cells. Inspect a model with `tracebook sheet <file>`; compare edits with `tracebook sheet <file> --diff <old>` (flags removed formulas).
+Runs an `.xlsx` model: writes inputs into a copy, recalculates, reads outputs. Inputs must be constant cells. Inspect a model with `databook sheet <file>`; compare edits with `databook sheet <file> --diff <old>` (flags removed formulas).
 
 ````md
 ```sheet whatif
@@ -67,7 +67,7 @@ show: Model!A1:B7
 ```
 ````
 
-Chart types: `bar`, `line`, `area`, `pie`, `funnel`, `radial`, `combo`. `tracebook components` lists variants and fields.
+Chart types: `bar`, `line`, `area`, `pie`, `funnel`, `radial`, `combo`. `databook components` lists variants and fields.
 
 ## Prose refs
 

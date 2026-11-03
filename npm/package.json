@@ -1,11 +1,11 @@
 {
-  "name": "tracebook-cli",
+  "name": "databook-cli",
   "version": "0.1.0",
   "description": "Agent-native data notebook: your coding agent answers data questions in SQL/Python notebooks where every number traces to the block that computed it.",
   "keywords": ["data", "notebook", "duckdb", "sql", "agent", "claude-code", "codex", "opencode", "pi"],
-  "homepage": "https://github.com/StTronn/tracebook",
-  "repository": { "type": "git", "url": "git+https://github.com/StTronn/tracebook.git", "directory": "npm" },
-  "bin": { "tracebook": "bin/tracebook.js", "tracebook-cli": "bin/tracebook.js" },
+  "homepage": "https://github.com/StTronn/databook",
+  "repository": { "type": "git", "url": "git+https://github.com/StTronn/databook.git", "directory": "npm" },
+  "bin": { "databook": "bin/databook.js", "databook-cli": "bin/databook.js" },
   "files": ["bin", "dist"],
   "engines": { "node": ">=18" },
   "scripts": { "prepack": "node scripts/build.mjs" }

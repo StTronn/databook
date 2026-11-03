@@ -10,9 +10,9 @@ const count = (s: string, sub: string) => s.split(sub).length - 1
 
 // Vite minifies inline <style> (dropping the slot comment) and inlines the bundle CSS after it. Restore the theme slot
 // at the end of <head> so a project theme.css always wins the cascade; fail the build unless each slot occurs exactly once.
-function tracebookSlots(): Plugin {
+function databookSlots(): Plugin {
   return {
-    name: "tracebook-slots",
+    name: "databook-slots",
     enforce: "post",
     generateBundle: {
       order: "post",
@@ -33,10 +33,10 @@ function tracebookSlots(): Plugin {
 }
 
 // One self-contained file (JS, CSS, fonts inlined) → shipped inside the Python package.
-// `tracebook export` fills the data/theme slots in index.html; `vite` dev proxies a running `tracebook dev`.
+// `databook export` fills the data/theme slots in index.html; `vite` dev proxies a running `databook dev`.
 export default defineConfig({
-  plugins: [react(), tailwindcss(), viteSingleFile(), tracebookSlots()],
+  plugins: [react(), tailwindcss(), viteSingleFile(), databookSlots()],
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "src") } },
-  build: { outDir: "../src/tracebook/viewer", emptyOutDir: true, assetsInlineLimit: () => true },
+  build: { outDir: "../src/databook/viewer", emptyOutDir: true, assetsInlineLimit: () => true },
   server: { proxy: { "/results.json": "http://127.0.0.1:4321", "/version": "http://127.0.0.1:4321", "/theme.css": "http://127.0.0.1:4321", "/api": "http://127.0.0.1:4321" } },
 })

@@ -1,52 +1,52 @@
 ---
 title: CLI reference
-description: Every tracebook subcommand. Output is compact text for agents; tracebook --json <cmd> for machines. Exit 1 = diagnostics or errors.
+description: Every databook subcommand. Output is compact text for agents; databook --json <cmd> for machines. Exit 1 = diagnostics or errors.
 ---
 
-Every `tracebook` subcommand. Output is compact text for agents; `tracebook --json <cmd>` for machines. Exit 1 = diagnostics or errors.
+Every `databook` subcommand. Output is compact text for agents; `databook --json <cmd>` for machines. Exit 1 = diagnostics or errors.
 
 ## Project
 
 | Command | Does |
 |---|---|
-| `tracebook init <dir> [--template T] [--tz TZ] [--demo]` | create a workspace; `--demo` writes synthetic data for templates that support it |
-| `tracebook new <name> [--template T]` | add `notebooks/<name>.md` (folders allowed: `growth/cohorts`) |
+| `databook init <dir> [--template T] [--tz TZ] [--demo]` | create a workspace; `--demo` writes synthetic data for templates that support it |
+| `databook new <name> [--template T]` | add `notebooks/<name>.md` (folders allowed: `growth/cohorts`) |
 
 ## Data
 
 | Command | Does |
 |---|---|
-| `tracebook import <files…> [--types col=type,…] [--as pack.table] [--name N]` | load files into the workspace database; `--as` forces a source pack (e.g. `razorpay.payments`) |
-| `tracebook source add <name> --type {postgres,mysql,sqlite,duckdb} (--env VAR \| --path FILE)` | attach a read-only database |
-| `tracebook source list` · `tracebook source remove <name>` | |
-| `tracebook schema [table…] [--nb NB]` | tables, columns, types (plus the notebook's block outputs) |
-| `tracebook query "<sql>" [-n N] [--nb NB]` | read-only SQL; blocks queryable by bare name |
+| `databook import <files…> [--types col=type,…] [--as pack.table] [--name N]` | load files into the workspace database; `--as` forces a source pack (e.g. `razorpay.payments`) |
+| `databook source add <name> --type {postgres,mysql,sqlite,duckdb} (--env VAR \| --path FILE)` | attach a read-only database |
+| `databook source list` · `databook source remove <name>` | |
+| `databook schema [table…] [--nb NB]` | tables, columns, types (plus the notebook's block outputs) |
+| `databook query "<sql>" [-n N] [--nb NB]` | read-only SQL; blocks queryable by bare name |
 
 ## Notebooks
 
 | Command | Does |
 |---|---|
-| `tracebook check [--nb NB] [--full]` | run all blocks and validate; `--full` with `--json` includes results |
-| `tracebook snapshot [--nb NB] [--full]` | run and list blocks with status and shape |
-| `tracebook diff [--nb NB]` | per-block changes between the last two runs with different notebook/data |
-| `tracebook comments [--nb NB] [--all]` | open review comments from the viewer |
-| `tracebook comments resolve <id> --note '…'` | resolve with a note shown to the reviewer |
-| `tracebook sheet <file.xlsx> [--range S!A1:D20] [--diff OLD] [-n N]` | inspect/recalc a model, list formula errors, or diff against an older copy |
-| `tracebook components [type…]` | chart types, variants and fields the viewer renders |
+| `databook check [--nb NB] [--full]` | run all blocks and validate; `--full` with `--json` includes results |
+| `databook snapshot [--nb NB] [--full]` | run and list blocks with status and shape |
+| `databook diff [--nb NB]` | per-block changes between the last two runs with different notebook/data |
+| `databook comments [--nb NB] [--all]` | open review comments from the viewer |
+| `databook comments resolve <id> --note '…'` | resolve with a note shown to the reviewer |
+| `databook sheet <file.xlsx> [--range S!A1:D20] [--diff OLD] [-n N]` | inspect/recalc a model, list formula errors, or diff against an older copy |
+| `databook components [type…]` | chart types, variants and fields the viewer renders |
 
 ## Output
 
 | Command | Does |
 |---|---|
-| `tracebook dev [--port 4321] [--open]` | live viewer |
-| `tracebook export [out] [--nb NB] [--force]` | self-contained HTML (default `dist/index.html`) |
-| `tracebook export --block <id> <out.csv>` | one compute block's result as CSV |
+| `databook dev [--port 4321] [--open]` | live viewer |
+| `databook export [out] [--nb NB] [--force]` | self-contained HTML (default `dist/index.html`) |
+| `databook export --block <id> <out.csv>` | one compute block's result as CSV |
 
 ## Setup
 
 | Command | Does |
 |---|---|
-| `tracebook setup` | copy the skill into every detected agent (Claude Code, Codex, OpenCode, pi) and `~/.agents/skills` |
-| `tracebook doctor` | show which agents have the skill |
-| `tracebook --version` | installed version |
-| `tracebook skill guide <pack>` | print a source pack's guide (e.g. `razorpay`) |
+| `databook setup` | copy the skill into every detected agent (Claude Code, Codex, OpenCode, pi) and `~/.agents/skills` |
+| `databook doctor` | show which agents have the skill |
+| `databook --version` | installed version |
+| `databook skill guide <pack>` | print a source pack's guide (e.g. `razorpay`) |

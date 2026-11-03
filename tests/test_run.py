@@ -5,10 +5,10 @@ from decimal import Decimal
 from openpyxl import load_workbook
 
 from conftest import block, results, row
-from tracebook.cli import main
-from tracebook.core.notebook import parse, resolve
-from tracebook.core.values import fmt, to_json
-from tracebook.packs.razorpay.demo import generate
+from databook.cli import main
+from databook.core.notebook import parse, resolve
+from databook.core.values import fmt, to_json
+from databook.packs.razorpay.demo import generate
 
 
 def _expected():

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useComments } from "@/hooks/use-comments"
 
 /** Review thread for one block: open/resolved comments + a box to add one. The agent picks them up with
- *  `tracebook comments` and answers with `tracebook comments resolve <id> --note …`. */
+ *  `databook comments` and answers with `databook comments resolve <id> --note …`. */
 export function BlockComments({ block, anchor }: { block: string; anchor?: string }) {
   const { forBlock, add, resolve } = useComments()
   const [text, setText] = useState("")
@@ -65,7 +65,7 @@ export function BlockComments({ block, anchor }: { block: string; anchor?: strin
       <form onSubmit={submit} className="flex flex-col gap-2">
         <Textarea
           aria-label="Comment for the agent"
-          placeholder="Ask for a change; the agent sees it in `tracebook comments`"
+          placeholder="Ask for a change; the agent sees it in `databook comments`"
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={pending}
