@@ -10,6 +10,8 @@ import {
   useNotebook,
 } from "@/components/notebook/notebook-context";
 import { CommentsProvider } from "@/hooks/use-comments";
+import { AgentProvider } from "@/hooks/use-agent";
+import { Composer, SelectionAsk } from "@/components/agent/composer";
 import { TraceDrawer } from "@/components/notebook/trace-drawer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -105,6 +107,18 @@ function Loading() {
   );
 }
 
+/** Agent UI only in the live dev viewer with a notebook open (exports stay static). */
+function AgentGate({ enabled, onActivity, children }: { enabled: boolean; onActivity: () => void; children: React.ReactNode }) {
+  if (!enabled) return <>{children}</>;
+  return (
+    <AgentProvider onActivity={onActivity}>
+      {children}
+      <Composer />
+      <SelectionAsk />
+    </AgentProvider>
+  );
+}
+
 export function App() {
   const { route, navigate } = useHashRoute();
   const { ws, refresh } = useWorkspace();
@@ -115,6 +129,11 @@ export function App() {
   const [rightSheet, setRightSheet] = useState(false); // below xl
   const [tab, setTab] = useState<PanelTab>("outputs");
   const [pending, setPending] = useState<Target | null>(null);
+  const openAgent = useCallback(() => {
+    setTab("agent");
+    if (window.matchMedia("(min-width: 1280px)").matches) setRightOpen(true);
+    else setRightSheet(true);
+  }, []);
 
   // Export: the embedded doc only. Dev: #/n/<key>, #/t/<table>, home = first notebook.
   const nbKey = embedded
@@ -256,6 +275,7 @@ export function App() {
   return (
     <NotebookProvider doc={doc && !table ? doc : NO_DOC} view={view}>
       <CommentsProvider notebook={doc && !table ? doc.notebook : null}>
+      <AgentGate enabled={!embedded && !!doc && !table} onActivity={openAgent}>
         <div className="flex h-svh flex-col">
           <AppHeader
             crumbs={crumbs}
@@ -324,6 +344,7 @@ export function App() {
         ) : null}
         <TraceDrawer />
         <PendingScroll target={pending} done={clearPending} />
+      </AgentGate>
       </CommentsProvider>
     </NotebookProvider>
   );

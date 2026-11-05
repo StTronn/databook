@@ -97,7 +97,7 @@
   --label-transform: uppercase;
   /* heading scale: notebook title, section (h2), subsection (h3) */
   --title-size: 1.125rem;
-  --h2-size: 1.125rem;
+  --h2-size: 1.375rem;
   --h3-size: 1rem;
   --heading-weight: 600;
   --heading-tracking: 0;

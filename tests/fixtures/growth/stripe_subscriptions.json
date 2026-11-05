@@ -1,0 +1,3 @@
+{"object": "list", "data": [
+ {"id": "sub_1", "object": "subscription", "customer": "cus_A", "status": "active", "currency": "usd", "created": 1704067200, "start_date": 1704067200, "canceled_at": null, "cancel_at_period_end": false, "items": {"object": "list", "data": [{"id": "si_1", "price": {"unit_amount": 2900, "recurring": {"interval": "month"}}, "quantity": 1}]}},
+ {"id": "sub_2", "object": "subscription", "customer": "cus_B", "status": "canceled", "currency": "usd", "created": 1704153600, "start_date": 1704153600, "canceled_at": 1706745600, "cancel_at_period_end": false, "items": {"object": "list", "data": [{"id": "si_2", "price": {"unit_amount": 29000, "recurring": {"interval": "year"}}, "quantity": 1}]}}], "has_more": false}

@@ -106,6 +106,10 @@ def import_files(project: Project, paths: list[Path], forced: str | None = None,
                 continue
             if hint:
                 rep.warnings.append(f"{t.source}: {hint}")
+            if m and m.spec.prepare:
+                n = len(t.warnings)
+                m.spec.prepare(t)
+                rep.warnings += [f"{t.source}: {w}" for w in t.warnings[n:]]
             plan = _column_plan(t, m, overrides, rep)
             if plan is None:
                 continue
@@ -119,6 +123,11 @@ def import_files(project: Project, paths: list[Path], forced: str | None = None,
                 rep.errors.append(f"SCHEMA_MISMATCH {t.source}: columns/types differ from other files for "
                                   f"table {tname}; import it separately with --name")
                 continue
+            if m and not m.spec.key and st["rows"]:   # keyless (lines, events, ad rows): never drop, but flag overlap
+                prev = set(map(tuple, st["rows"]))
+                if dup := sum(tuple(r) in prev for r in rows):
+                    rep.warnings.append(f"{t.source}: {dup} row(s) identical to rows of another file in {tname}; "
+                                        "overlapping exports double-count — import non-overlapping date ranges")
             st["rows"] += rows
             st["files"].append({"path": label, "sha256": _sha(p), "rows": len(rows)})
     if not staged:
@@ -149,7 +158,7 @@ def _load(con, tname: str, st: dict, rep: Report) -> dict:
                 "columns": cols}
     plan, rows, m = st["plan"], st["rows"], st["match"]
     key = [plan.index(next(p for p in plan if p[0] == k)) for k in m.spec.key] \
-        if m and all(any(p[0] == k for p in plan) for k in m.spec.key) else None
+        if m and m.spec.key and all(any(p[0] == k for p in plan) for k in m.spec.key) else None
     if key:
         seen, uniq, conflicts = {}, [], 0
         for r in rows:

@@ -1,0 +1,4 @@
+id,Created date (UTC),Amount,Amount Refunded,Currency,Captured,Converted Amount,Converted Amount Refunded,Converted Currency,Decline Reason,Description,Fee,Refunded date (UTC),Statement Descriptor,Status,Seller Message,Taxes On Fee,Card ID,Customer ID,Customer Description,Customer Email,Invoice ID,PaymentIntent ID,Mode,plan (metadata)
+ch_3OaA1,2024-01-15 15:23:45,81.30,0.00,usd,true,81.30,0.00,usd,,Order #1001,2.66,,ACME,Paid,Payment complete.,0.00,card_1,cus_A,,ana@example.com,in_1,pi_1,Live,pro
+ch_3OaA2,2024-02-01 23:00:00,40.00,40.00,usd,true,40.00,40.00,usd,,Order #1002,1.46,2024-02-03 10:00:00,ACME,Refunded,Payment complete.,0.00,card_2,cus_B,,bo@example.com,,pi_2,Live,
+ch_3OaA3,2024-02-02 08:00:00,1000,0,jpy,false,9.10,0.00,usd,insufficient_funds,,0,,ACME,Failed,The bank declined.,0,card_3,cus_C,,cy@example.com,,pi_3,Live,

@@ -1,14 +1,22 @@
 import { CornerDownRightIcon } from "lucide-react"
+import { useLive } from "@/app/live-context"
 import { BlockError } from "@/components/notebook/block-error"
 import { useNotebook } from "@/components/notebook/notebook-context"
 import { ResultTable } from "@/components/notebook/result-table"
 import { Button } from "@/components/ui/button"
+import { pickParam } from "@/components/notebook/param-bar"
 import { Card } from "@/components/ui/card"
 import { plural } from "@/lib/notebook"
 import type { TableBlock } from "@/types"
 
 export function TableView({ block }: { block: TableBlock }) {
-  const { openTrace } = useNotebook()
+  const { openTrace, doc } = useNotebook()
+  const { live } = useLive()
+  const link = live ? block.link : undefined                  // exported reports have no server to rerun with a pick
+  const onLink = link
+    ? (row: number) => void pickParam(doc.notebook, link.param, link.values[row]).then(() =>
+        document.getElementById("tb-params")?.scrollIntoView({ behavior: "smooth", block: "start" }))
+    : undefined
   return (
     <Card className="gap-2 py-3">
       <div className="flex min-w-0 items-center gap-2 px-3">
@@ -31,6 +39,8 @@ export function TableView({ block }: { block: TableBlock }) {
             rowCount={block.rowCount}
             truncated={block.truncated}
             limit={25}
+            linkCol={link ? block.columns.indexOf(link.column) : -1}
+            onLink={onLink}
           />
         )}
       </div>

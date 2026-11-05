@@ -1,6 +1,6 @@
 [project]
 name = "databook"
-version = "0.1.1"
+version = "0.1.2"
 description = "Agent-native data notebook: SQL, Python and formula-model blocks over your files, rendered as a traceable report."
 requires-python = ">=3.10"
 dependencies = ["duckdb>=1.1", "pandas>=2.2", "openpyxl>=3.1", "formualizer>=0.5.8", "pyyaml>=6", "pytz"]
@@ -10,6 +10,11 @@ databook = "databook.cli:main"
 
 [project.entry-points."databook.packs"]
 razorpay = "databook.packs.razorpay:PACK"
+shopify = "databook.packs.growth:SHOPIFY_PACK"
+stripe = "databook.packs.growth:STRIPE_PACK"
+ga4 = "databook.packs.growth:GA4_PACK"
+meta_ads = "databook.packs.growth:META_ADS_PACK"
+google_ads = "databook.packs.growth:GOOGLE_ADS_PACK"
 
 [dependency-groups]
 dev = ["pytest>=8"]

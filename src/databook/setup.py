@@ -5,7 +5,8 @@ upgrade or cache pruning, so a symlink would dangle. A copy carries a marker fil
 created (marker present) or old `databook skill install` symlinks, never a user's own `databook` skill directory.
 Skill locations (checked against each agent's docs): Claude Code ~/.claude/skills, Codex ~/.codex/skills,
 pi ~/.pi/agent/skills, OpenCode ~/.config/opencode/skills; ~/.agents/skills (Agent Skills standard; read by pi and
-OpenCode) is always written.
+OpenCode) is always written. pi also gets the viewer-bridge extension (integrations/pi/databook.ts) copied to
+~/.pi/agent/extensions/databook.ts; the copy's first line is its marker, a file without it is the user's and is left alone.
 """
 from __future__ import annotations
 
@@ -16,6 +17,9 @@ from pathlib import Path
 
 SKILL = Path(__file__).parent / "skill"
 MARKER = ".databook-skill"
+PI_EXT = Path(__file__).parent / "integrations" / "pi" / "databook.ts"
+PI_EXT_DIR = "~/.pi/agent/extensions"
+EXT_MARK = "// databook setup v"           # first line of our copy of the pi extension
 # Before the rename the tool was "trace" + "book": its skill dir and marker. setup removes those copies (marker or
 # symlink only) so agents don't load two skills, one of them pointing at a command that no longer exists.
 LEGACY = ("trace" + "book", ".trace" + "book-skill")
@@ -71,6 +75,29 @@ def install(target: Path) -> str:
     return "updated" if st == "ours" else "installed"
 
 
+def ext_state(target: Path) -> tuple[str, str]:
+    """(missing | ours | foreign, version) for the pi extension file. A symlink is the user's (e.g. a dev checkout)."""
+    if not target.exists() and not target.is_symlink():
+        return "missing", ""
+    if target.is_symlink() or not target.is_file():
+        return "foreign", ""
+    with target.open(errors="replace") as f:
+        first = f.readline()
+    return ("ours", (first[len(EXT_MARK):].split() or [""])[0]) if first.startswith(EXT_MARK) else ("foreign", "")
+
+
+def install_ext(target: Path) -> str:
+    st, _ = ext_state(target)
+    if st == "foreign":
+        return "skipped: a databook.ts you created is there (remove it to let setup manage it)"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(f".{target.name}.tmp")    # dotfile + atomic replace: pi never loads a half-written copy
+    tmp.write_text(f"{EXT_MARK}{tb_version()} (managed by `databook setup`; delete this line to keep your edits)\n"
+                   + PI_EXT.read_text())
+    tmp.replace(target)
+    return "updated" if st == "ours" else "installed"
+
+
 def setup(only: list[str] | None = None) -> list[tuple[str, Path, str]]:
     """[(agent, skill dir, result)] for detected agents (or the named ones, detected or not)."""
     out = []
@@ -85,6 +112,9 @@ def setup(only: list[str] | None = None) -> list[tuple[str, Path, str]]:
             out.append((name, target, "not found, skipped"))
             continue
         out.append((name, target, install(target)))
+        if name == "pi":
+            ext = _home(PI_EXT_DIR) / "databook.ts"
+            out.append(("pi extension", ext, install_ext(ext)))
     return out
 
 
@@ -101,4 +131,10 @@ def doctor() -> list[tuple[str, str]]:
         skill = {"missing": "no skill", "foreign": "your own skill dir", "ours": f"skill {ver or 'linked'}"}[st]
         stale = " (outdated: run `databook setup`)" if ver and ver != tb_version() else ""
         rows.append((name, f"{agent}, {skill}{stale} — {t}"))
+        if name == "pi":
+            e = _home(PI_EXT_DIR) / "databook.ts"
+            st, ver = ext_state(e)
+            stale = " (outdated: run `databook setup`)" if ver and ver != tb_version() else ""
+            rows.append(("pi extension", {"missing": "not installed", "foreign": "your own file",
+                                          "ours": f"extension {ver}{stale}"}[st] + f" — {e}"))
     return rows

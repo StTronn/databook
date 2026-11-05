@@ -9,6 +9,7 @@ A pack is any object registered under the `databook.packs` entry-point group wit
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Callable
 from importlib.metadata import entry_points
 from pathlib import Path
 
@@ -22,7 +23,8 @@ class Kind:
     columns: dict[str, str]                         # column → converter name (exports, major units)
     entity: str | None = None                       # JSON items' `entity` value (API / CLI output)
     json_columns: dict[str, str] = field(default_factory=dict)  # overrides for JSON (minor units, unix)
-    key: tuple[str, ...] = ("id",)
+    key: tuple[str, ...] = ("id",)                   # () = no dedup (line items, events, ad rows)
+    prepare: Callable | None = None                 # (RawTable) → None: drop footer rows, null tokens, renames
 
 
 @dataclass

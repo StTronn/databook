@@ -39,7 +39,7 @@ def cmd_init(args):
         tpl = templates().get(args.template)
         if not tpl:
             raise ProjectError(f"unknown template {args.template!r}; available: {', '.join(templates()) or 'none'}")
-    tz = args.tz or next((p.timezone for p in packs().values() if tpl and tpl.is_relative_to(p.templates)), None) or "UTC"
+    tz = args.tz or next((p.timezone for p in packs().values() if tpl and getattr(p, "templates", None) and tpl.is_relative_to(p.templates)), None) or "UTC"
     try:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError):
@@ -250,6 +250,29 @@ def cmd_diff(args):
     _out(args, {"base": base["ranAt"], "new": new["ranAt"], "changes": ch}, "\n".join(text))
 
 
+def cmd_param(args):
+    p = Project.find()
+    key = p.nb(args.nb).key
+    vals = p.params(key)
+    for pair in args.values:
+        name, eq, raw = pair.partition("=")
+        if not eq or not name:
+            raise ProjectError(f"expected name=value, got {pair!r}")
+        try:
+            vals[name] = json.loads(raw)               # 12346 → number, "abc"/abc → text
+        except json.JSONDecodeError:
+            vals[name] = raw
+    if args.values:
+        p.save_params(key, vals)
+    rp = p.nb(key).results_path
+    doc = json.loads(rp.read_text()) if rp.exists() else {}
+    shown = {x["name"]: x for x in doc.get("params", [])}
+    lines = [f"{n} = {v!r}" + (f"  (last run used {shown[n]['display']})" if n in shown else "") for n, v in vals.items()]
+    lines += [f"{n} = {x['display']}  (default)" for n, x in shown.items() if n not in vals]
+    _out(args, {"picked": vals, "lastRun": list(shown.values())}, ("\n".join(lines) or "no params picked or declared")
+         + ("" if not args.values else "\nrun `databook check` to use them"))
+
+
 def cmd_comments(args):
     from databook import comments
     p = Project.find()
@@ -301,6 +324,8 @@ def cmd_export(args):
         return 0
     single = len(p.notebooks()) == 1
     out = Path(args.out or (p.root / "dist" / ("index.html" if single else f"{doc['notebook']}.html")))
+    for x in doc.get("params", []):         # a static report can't re-pick: ship the value used, not every option
+        x["options"] = []
     export_html(doc, out, p.root)
     pii = [d for d in doc["diagnostics"] if d["code"] == "PII_COLUMN_PUBLISHED"]
     _out(args, {"path": str(out)}, f"wrote {out} ({out.stat().st_size // 1024} KB, block results only, no raw tables)"
@@ -389,6 +414,50 @@ def cmd_doctor(args):
     _out(args, dict(rows), "\n".join(f"{k:<22} {v}" for k, v in rows))
 
 
+def _agent_name(args) -> str:
+    import os
+    return args.agent or ("claude" if os.environ.get("CLAUDECODE") else "codex" if os.environ.get("CODEX_SANDBOX") else "agent")
+
+
+def cmd_inbox(args):
+    """Agent side of the viewer's Agent panel: claim the next request (optionally waiting) and print it as a prompt."""
+    import time
+    from databook import agent
+    p = Project.find()
+    name = _agent_name(args)
+    if args.beat:
+        agent.beat(p, name, args.session)
+        return 0
+    deadline = time.time() + args.timeout if args.timeout else None
+    while True:
+        r = agent.claim(p, name, args.session)
+        if r:
+            _out(args, {"request": {k: v for k, v in r.items() if k not in ("before", "before_sha", "after_sha")},
+                        "prompt": agent.prompt(r)}, agent.prompt(r))
+            return 0
+        if not args.wait or (deadline and time.time() > deadline):
+            if not args.wait:
+                print("no pending requests")
+            return 1
+        agent.beat(p, name, args.session)
+        time.sleep(1)
+
+
+def cmd_reply(args):
+    from databook import agent
+    p = Project.find()
+    if args.done or args.error:
+        r = agent.finish(p, args.id, args.text, args.error)
+        ch = r["changes"]
+        _out(args, {"status": r["status"], "changes": ch},
+             f"✓ request {r['id']} {r['status']}" + (f"; {len(ch)} change(s): " + ", ".join(c["label"] for c in ch) if ch else "; no changes"))
+        return 0 if r["status"] == "done" else 1
+    if args.step or args.text:
+        agent.step(p, args.id, args.step or args.text)
+        return 0
+    raise ProjectError("usage: databook reply <id> --step TEXT | --done [--text TEXT] | --error TEXT")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="databook", description=__doc__)
     ap.add_argument("--json", action="store_true", help="machine-readable output")
@@ -436,6 +505,10 @@ def main(argv=None) -> int:
     s = sub.add_parser("diff", help="per-block changes between the last two runs with different notebook/data")
     s.add_argument("--nb", help="notebook (default: the only one)")
     s.set_defaults(fn=cmd_diff)
+    s = sub.add_parser("param", help="pick notebook parameter values (frontmatter `params:`): param customer=12346")
+    s.add_argument("values", nargs="*", help="name=value")
+    s.add_argument("--nb", help="notebook (default: the only one)")
+    s.set_defaults(fn=cmd_param)
     s = sub.add_parser("comments", help="review comments left in the viewer; `comments resolve <id> --note …`")
     s.add_argument("action", nargs="?", choices=["resolve"])
     s.add_argument("id", nargs="?", type=int)
@@ -462,6 +535,20 @@ def main(argv=None) -> int:
     s = sub.add_parser("components", help="chart types, variants and fields the viewer can render")
     s.add_argument("type", nargs="*")
     s.set_defaults(fn=cmd_components)
+    s = sub.add_parser("inbox", help="agent side of the viewer's Agent panel: claim the next request (--wait to block)")
+    s.add_argument("--wait", action="store_true", help="block until a request arrives (run it in the background)")
+    s.add_argument("--timeout", type=float, help="give up after N seconds (with --wait)")
+    s.add_argument("--agent", help="claude | codex | pi | … (default: detected)")
+    s.add_argument("--session", help="the agent's session id, if it has one (lets the viewer show it)")
+    s.add_argument("--beat", action="store_true", help="only mark this session as listening (push-style agents)")
+    s.set_defaults(fn=cmd_inbox)
+    s = sub.add_parser("reply", help="report progress/answer for a viewer request: --step, --done [--text], --error")
+    s.add_argument("id")
+    s.add_argument("--step")
+    s.add_argument("--text")
+    s.add_argument("--done", action="store_true")
+    s.add_argument("--error")
+    s.set_defaults(fn=cmd_reply)
     s = sub.add_parser("setup", help="install the agent skill into every coding agent found (Claude Code, Codex, pi, OpenCode)")
     s.add_argument("--agent", action="append", help="only this agent (repeatable), installed even if not detected")
     s.set_defaults(fn=cmd_setup)

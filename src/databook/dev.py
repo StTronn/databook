@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import threading
 import time
 import webbrowser
@@ -36,14 +37,15 @@ def export_html(doc: dict, out: Path, root: Path) -> None:
 def _inputs(p: Project) -> tuple[dict[str, float], dict[str, float], tuple]:
     """mtimes: (per notebook, shared inputs that affect every notebook, (theme.css, comments) → refetch only)."""
     mt = lambda f: f.stat().st_mtime if f.exists() else None
-    notes = {k: mt(f) for k, f in p.notebooks().items()}
+    notes = {k: (mt(f), mt(p.nb(k).params_path)) for k, f in p.notebooks().items()}   # picking a param reruns
     shared = {str(f): mt(f) for f in [p.dir / "import.json", p.dir / "config.json", p.dir / "sources.json",
                                       *p.root.glob("models/**/*.xlsx")]}
     return notes, shared, (mt(p.root / "theme.css"), mt(p.dir / "comments.json"))
 
 
 def serve(p: Project, port: int, open_browser: bool) -> None:
-    from databook import comments, workspace
+    from databook import agent, comments, workspace
+    token = secrets.token_urlsafe(24)       # per server run; embedded in the served page, required for agent requests
     from databook.packs import templates
     from databook.project import ProjectError
     from databook.run import run_notebook
@@ -132,8 +134,12 @@ def serve(p: Project, port: int, open_browser: bool) -> None:
                     return self._json({"comments": comments.items(p, q.get("nb"), include_resolved=True)})
                 if u.path == "/api/preview":
                     return self._json(workspace.preview(p, q.get("table", ""), int(q.get("limit", workspace.PREVIEW_ROWS))))
+                if u.path == "/api/agent/thread":
+                    return self._json(agent.thread(p, q.get("nb", "")))
                 if u.path in ("/", "/index.html"):
-                    return self._send(VIEWER.read_bytes(), "text/html; charset=utf-8")
+                    # right after the real <head> (the first one, before any bundled code that may contain tag-like text)
+                    html = VIEWER.read_text().replace("<head>", f"<head><script>window.__TB_TOKEN__={json.dumps(token)}</script>", 1)
+                    return self._send(html.encode(), "text/html; charset=utf-8")
             except (ProjectError, ValueError) as e:
                 return self._json({"error": str(e)}, 400)
             self.send_error(404)
@@ -146,7 +152,9 @@ def serve(p: Project, port: int, open_browser: bool) -> None:
                     origin and urlparse(origin).hostname not in ("127.0.0.1", "localhost")):
                 return self._json({"error": "JSON requests from this page only"}, 403)   # blocks cross-site forms
             path = urlparse(self.path).path
-            if path not in ("/api/notebooks", "/api/comments", "/api/comments/resolve"):
+            if path.startswith("/api/agent/"):
+                return self._agent_post(path)
+            if path not in ("/api/notebooks", "/api/comments", "/api/comments/resolve", "/api/params"):
                 return self.send_error(404)
             try:
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
@@ -155,6 +163,12 @@ def serve(p: Project, port: int, open_browser: bool) -> None:
                                                    str(body.get("text", "")), str(body.get("anchor") or "") or None))
                 if path == "/api/comments/resolve":
                     return self._json(comments.resolve(p, int(body.get("id")), body.get("note")))
+                if path == "/api/params":            # picker: store the values; the watcher reruns the notebook
+                    key, values = p.nb(str(body.get("notebook", ""))).key, body.get("values")
+                    if not isinstance(values, dict) or not all(isinstance(k, str) for k in values):
+                        raise ValueError("values must be an object {param: value}")
+                    p.save_params(key, {**p.params(key), **values})
+                    return self._json({"ok": True})
                 name, tpl_name = str(body.get("name", "")), body.get("template")
                 tpl = templates().get(tpl_name) if tpl_name else None
                 if tpl_name and not tpl:
@@ -164,6 +178,26 @@ def serve(p: Project, port: int, open_browser: bool) -> None:
                 key = created[0].removeprefix("notebooks/").removesuffix(".md")
                 rerun([key])
                 return self._json({"key": key, "created": created, "skipped": skipped})
+            except (ProjectError, ValueError, TypeError) as e:
+                return self._json({"error": str(e)}, 400)
+
+        def _agent_post(self, path: str):
+            # Starting agent work is the most powerful action here: besides the localhost/JSON/origin checks above,
+            # require the token embedded in the page this server served (a copied URL or another page can't know it).
+            if not secrets.compare_digest(self.headers.get("X-Databook-Token") or "", token):
+                return self._json({"error": "missing or wrong page token; reload the viewer"}, 403)
+            try:
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+                if path == "/api/agent/requests":
+                    ctxs = body.get("contexts") if isinstance(body.get("contexts"), list) else []
+                    r = agent.create(p, str(body.get("notebook", "")), str(body.get("text", "")), ctxs)
+                    return self._json({"id": r["id"]})
+                if path == "/api/agent/stop":
+                    return self._json({"status": agent.stop(p, str(body.get("id", "")))["status"]})
+                if path == "/api/agent/undo":
+                    agent.undo(p, str(body.get("id", "")))
+                    return self._json({"undone": True})
+                return self.send_error(404)
             except (ProjectError, ValueError, TypeError) as e:
                 return self._json({"error": str(e)}, 400)
 

@@ -18,7 +18,7 @@ def test_setup_installs_into_detected_agents_and_shared_dir(tmp_path, monkeypatc
     assert main(["--json", "setup"]) == 0
     res = {r["agent"]: r["result"] for r in json.loads(capsys.readouterr().out)}
     assert res == {"Claude Code": "installed", "Codex": "not found, skipped", "pi": "installed",
-                   "OpenCode": "not found, skipped", "Agent Skills (shared)": "installed"}
+                   "pi extension": "installed", "OpenCode": "not found, skipped", "Agent Skills (shared)": "installed"}
     for d in (".claude/skills", ".pi/agent/skills", ".agents/skills"):
         sk = h / d / "databook"
         assert (sk / "SKILL.md").read_text() == (setup.SKILL / "SKILL.md").read_text()
@@ -77,3 +77,30 @@ def test_setup_removes_pre_rename_skill_copies_but_not_user_dirs(tmp_path, monke
     assert not old_copy.exists() and not old_link.is_symlink()
     assert (user_dir / "SKILL.md").read_text() == "mine"
     assert (h / ".claude/skills/databook/SKILL.md").exists()
+
+
+def test_pi_extension_installed_updated_never_overwrites_user_file_and_shown_in_doctor(tmp_path, monkeypatch, capsys):
+    h = _home(tmp_path, monkeypatch, ".claude")
+    ext = h / ".pi/agent/extensions/databook.ts"
+    main(["setup"])
+    assert not ext.exists()                                                          # pi not detected
+    (h / ".pi").mkdir()
+    main(["setup"])
+    first, rest = ext.read_text().split("\n", 1)
+    assert first.startswith(setup.EXT_MARK + setup.tb_version()) and rest == setup.PI_EXT.read_text()
+    ext.write_text(setup.EXT_MARK + "0.0.1\nold")                                    # our outdated copy
+    capsys.readouterr(); main(["--json", "doctor"])
+    assert "outdated" in json.loads(capsys.readouterr().out)["pi extension"]
+    main(["--json", "setup"])
+    assert {r["agent"]: r["result"] for r in json.loads(capsys.readouterr().out)}["pi extension"] == "updated"
+    assert ext.read_text().split("\n", 1)[1] == setup.PI_EXT.read_text()
+    main(["--json", "doctor"])
+    assert json.loads(capsys.readouterr().out)["pi extension"].startswith(f"extension {setup.tb_version()} — ")
+    ext.write_text("// my own bridge\n")                                             # user-made: never touched
+    main(["--json", "setup"])
+    assert {r["agent"]: r["result"] for r in json.loads(capsys.readouterr().out)}["pi extension"].startswith("skipped")
+    assert ext.read_text() == "// my own bridge\n"
+    main(["--json", "doctor"])
+    assert json.loads(capsys.readouterr().out)["pi extension"].startswith("your own file")
+    ext.unlink(); ext.symlink_to(tmp_path / "dev.ts")                                 # dev symlink (dangling): user's
+    assert setup.install_ext(ext).startswith("skipped") and ext.is_symlink()

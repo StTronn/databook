@@ -6,19 +6,22 @@ import json
 import re
 import traceback
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 
 from databook.core import anchors
-from databook.core.notebook import COMPUTE, INTERP, REF, Block, Diag, Notebook, parse, resolve
+from databook.core.notebook import COMPUTE, INTERP, REF, Block, Diag, Notebook, bind_params, parse, resolve, sql_params
 from databook.core.values import FORMATS, as_number, fmt, fmt_cell, to_json
 from databook import history
 from databook.engine import sheet as sheet_engine
 from databook.project import NotebookRef, Project, schema_for
 
 ROW_CAP = 1000
+PARAM_OPTIONS = 50000
+_PNAME = re.compile(r"^[a-z_][a-z0-9_]*$")
 REGISTRY = json.loads((Path(__file__).parent / "components.json").read_text())
 _STARTS = ("select", "with", "from", "values", "table", "pivot", "unpivot", "(")
 _LITERAL = re.compile(r"(?<![\w.{])([₹$€£]\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s?%|\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d{3,}(?:\.\d+)?)")
@@ -115,10 +118,10 @@ def _store_df(con, fq: str, df) -> None:
 _OUT_NAME = re.compile(r"^[A-Za-z0-9_]+$")
 
 
-def _run_python(con, b: Block, nb_line: int, tz: str, schema: str, taken: set[str]) -> list[str]:
+def _run_python(con, b: Block, nb_line: int, tz: str, schema: str, taken: set[str], params: dict) -> list[str]:
     """Run a python block. A DataFrame return → table `<id>`; a dict {name: DataFrame} → tables `<id>__<name>`
     (the first one is also `<id>`). → names of the named-output tables."""
-    ns = {"pd": pd, "Decimal": Decimal, "TZ": tz}
+    ns = {"pd": pd, "Decimal": Decimal, "TZ": tz, "params": dict(params)}
     for d in sorted(b.deps):
         ns[d] = _load_df(con, _fq(schema, d))
     have = {t for (t,) in con.execute("SELECT table_name FROM duckdb_tables() WHERE database_name = current_database() AND schema_name = ?", [schema]).fetchall()}
@@ -176,11 +179,94 @@ def _single(res: dict, bid: str, col: str):
     return res["rows"][0][names.index(col)], res["columns"][names.index(col)]["type"]
 
 
+def _param_specs(nb: Notebook) -> dict[str, dict]:
+    """Frontmatter `params: {name: {from: block.column, show?: block.column, default?, label?}}` → validated specs."""
+    raw, out = nb.meta.get("params"), {}
+    if raw is None:
+        return out
+    if not isinstance(raw, dict):
+        nb.diags.append(Diag(1, "BAD_PARAM", "params must map a name to {from: block.column, default?, label?, show?}"))
+        return out
+    for name, sp in raw.items():
+        m = REF.match(str(sp.get("from", ""))) if isinstance(sp, dict) else None
+        if not (isinstance(name, str) and _PNAME.match(name)) or not m:
+            nb.diags.append(Diag(1, "BAD_PARAM", f"param {name!r}: use a lower-case name and `from: block.column`"))
+            continue
+        if (b := nb.get(m[1])) is None or b.kind not in COMPUTE:
+            nb.diags.append(Diag(1, "BAD_PARAM", f"param {name}: `from` must name a sql/python/sheet block, not {m[1]!r}"))
+            continue
+        show = REF.match(str(sp["show"])) if sp.get("show") is not None else None
+        if sp.get("show") is not None and (not show or show[1] != m[1]):
+            nb.diags.append(Diag(1, "BAD_PARAM", f"param {name}: `show` must be a column of {m[1]} (block.column)"))
+            continue
+        out[name] = {"label": str(sp.get("label") or name), "block": m[1], "col": m[2],
+                     "show": show[2] if show else None, "default": sp.get("default")}
+    return out
+
+
+def _same(option, value) -> bool:
+    """A picked/default value (JSON or YAML) equals an option (DuckDB-typed): numerically for numeric options."""
+    if isinstance(option, bool) or not isinstance(option, (int, float, Decimal)):
+        return str(option) == str(value)
+    if isinstance(value, bool):
+        return False
+    try:                                             # exact: ids beyond 2**53 must not match a neighbour
+        return Decimal(str(option)) == Decimal(str(value))
+    except InvalidOperation:
+        return False
+
+
+def _param_value(con, schema: str, name: str, sp: dict, picked: dict, warn) -> dict:
+    """Options from the `from` block; value = picked (if still an option) → default → first option. Sets the variable."""
+    cols = _q(sp["col"]) + (f", {_q(sp['show'])}" if sp["show"] else "")
+    try:
+        rows = con.execute(f"SELECT DISTINCT {cols} FROM {_fq(schema, sp['block'])} WHERE {_q(sp['col'])} IS NOT NULL "
+                           f"ORDER BY ALL LIMIT {PARAM_OPTIONS + 1}").fetchall()
+    except duckdb.Error as e:
+        raise BlockError("BAD_PARAM", f"param {name}: {str(e).splitlines()[0]}") from None
+    opts: dict = {}
+    for r in rows[:PARAM_OPTIONS]:
+        opts.setdefault(r[0], r[-1])                 # first label wins when one value has several
+    if not opts:
+        raise BlockError("BAD_PARAM", f"param {name}: {sp['block']}.{sp['col']} has no values to pick from")
+    if len(rows) > PARAM_OPTIONS:
+        warn("PARAM_OPTIONS_TRUNCATED", f"param {name}: only the first {PARAM_OPTIONS} values can be picked")
+    find = lambda v: next((o for o in opts if _same(o, v)), None)
+    value = None
+    if name in picked and (value := find(picked[name])) is None:
+        warn("PARAM_VALUE_MISSING", f"param {name}: picked value {picked[name]!r} is no longer an option; using the default")
+    if value is None and sp["default"] is not None and (value := find(sp["default"])) is None:
+        warn("PARAM_DEFAULT_MISSING", f"param {name}: default {sp['default']!r} is not an option; using the first one")
+    if value is None:
+        value = next(iter(opts))
+    con.execute(f'SET VARIABLE "{name}" = ?', [value])
+    return {"name": name, "label": sp["label"], "value": to_json(value), "display": fmt_cell(opts[value]),
+            "options": [[to_json(o), fmt_cell(t)] for o, t in opts.items()], "truncated": len(rows) > PARAM_OPTIONS,
+            "py": value}
+
+
 def run_notebook(project: Project, key: str | None = None) -> dict:
     ref = project.nb(key)
     text = ref.path.read_text()
     nb = parse(text)
     tables = set(project.manifest["tables"])
+    nb.params = specs = _param_specs(nb)
+    uses: dict[str, set[str]] = {}                       # block → params it reads (implicit dep on the `from` block)
+    for b in nb.blocks:
+        if b.kind not in ("sql", "python"):
+            continue
+        used = {n for *_, n in sql_params(b.body)} if b.kind == "sql" else set(specs) if _mentions(b.body, "params") else set()
+        for n in sorted(used - specs.keys()):
+            nb.diags.append(Diag(b.line, "PARAM_UNKNOWN", f"{b.id} uses ${n}, but the notebook declares no param {n!r} "
+                                 "(frontmatter `params:`)", block=b.id))
+        uses[b.id] = used & specs.keys()
+        for n in sorted(uses[b.id]):
+            if specs[n]["block"] == b.id:
+                nb.diags.append(Diag(b.line, "CYCLE", f"{b.id} lists the options of param {n} and also reads it",
+                                     block=b.id))
+            else:
+                b.deps.add(specs[n]["block"])
+    picked, pvals = project.params(ref.key), {}
     order = resolve(nb, tables, frozenset(project.sources))
     for b in nb.blocks:
         b.tables = {t for t in tables if b.kind == "python" and _mentions(b.body, t)}
@@ -217,13 +303,18 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
                 try:
                     if gone := sorted({r.split(".")[0] for r in b.reads if "." in r} & down.keys()):
                         raise BlockError("SOURCE_UNAVAILABLE", "; ".join(down[n] for n in gone))
-                    extra = _compute(con, project, ref, b, results, tables | ids)
+                    extra = _compute(con, project, ref, b, results, tables | ids,
+                                     {n: pvals[n]["py"] for n in uses.get(b.id, ())})
                     for code, msg in extra.pop("warnings", []):
                         nb.diags.append(Diag(b.line, code, msg, "warning", b.id))
                     results[b.id] = _table_result(con, _fq(ref.schema, b.id))
                     for name in extra.get("outputs", []):
                         results[name] = _table_result(con, _fq(ref.schema, name))
                     status[b.id] = {"status": "ok", **extra}
+                    for n, sp in specs.items():          # options come from this block: settle the value now
+                        if sp["block"] == b.id:
+                            pvals[n] = _param_value(con, ref.schema, n, sp, picked, lambda c, m: nb.diags.append(
+                                Diag(1, c, m, "warning", b.id)))
                 except BlockError as e:
                     failed.add(b.id)
                     con.execute(f"DROP TABLE IF EXISTS {_fq(ref.schema, b.id)}")
@@ -246,12 +337,14 @@ def run_notebook(project: Project, key: str | None = None) -> dict:
         "path": ref.path.relative_to(project.root).as_posix(),
         **fingerprint(project, text, nb, json.dumps(
             {b.id: results[b.id]["hash"] if b.id in results else status.get(b.id, {}).get("error")
-             for b in nb.blocks if any("." in r for r in b.reads)}, sort_keys=True)),
+             for b in nb.blocks if any("." in r for r in b.reads)}, sort_keys=True)
+            + json.dumps({n: v["value"] for n, v in pvals.items()}, sort_keys=True, default=str)),
         "ranAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "timezone": project.config["timezone"],
         "title": nb.meta.get("title") or next((ln[2:].strip() for b in nb.blocks if b.kind == "md"
                                                 for ln in b.body.split("\n") if ln.startswith("# ")), "Notebook"),
         "meta": {k: v for k, v in nb.meta.items() if k in ("title", "description", "publish", "theme", "view")},
+        "params": [{k: v for k, v in pvals[n].items() if k != "py"} for n in specs if n in pvals],
         "blocks": out_blocks,
         "diagnostics": [vars(d) for d in sorted(nb.diags, key=lambda d: d.line)],
         "ok": errors == 0,
@@ -268,9 +361,10 @@ def _mentions(body: str, name: str) -> bool:
     return re.search(rf"(?<![\w.]){re.escape(name)}(?!\w)", body) is not None
 
 
-def _compute(con, project: Project, nbr: NotebookRef, b: Block, results: dict, taken: set[str]) -> dict:
+def _compute(con, project: Project, nbr: NotebookRef, b: Block, results: dict, taken: set[str],
+             params: dict | None = None) -> dict:
     if b.kind == "sql":
-        sql = b.body.strip().rstrip(";").strip()
+        sql = bind_params(b.body.strip().rstrip(";").strip())
         if not sql.lower().startswith(_STARTS):
             raise BlockError("SQL_ERROR", "sql blocks must be a single query (SELECT / WITH / FROM …)")
         ordered, arbitrary = _top_level(con, sql)
@@ -290,7 +384,7 @@ def _compute(con, project: Project, nbr: NotebookRef, b: Block, results: dict, t
         return {"warnings": [("UNORDERED_LIMIT", f"{b.id} uses LIMIT / DISTINCT ON without ORDER BY, so which rows "
                               "it keeps can change between runs; add an ORDER BY")]} if arbitrary else {}
     if b.kind == "python":
-        outs = _run_python(con, b, b.line + 1, project.config["timezone"], nbr.schema, taken)
+        outs = _run_python(con, b, b.line + 1, project.config["timezone"], nbr.schema, taken, params or {})
         return {"outputs": outs} if outs else {}
     spec = b.spec if isinstance(b.spec, dict) else {}
     inputs = {}
@@ -436,6 +530,12 @@ def _render(b: Block, results: dict, status: dict, nb: Notebook, hints: dict) ->
         if missing:
             out.update(diag(BlockError("CHART_COLUMN_MISSING", f"columns {missing} not in {s['data']}")))
             return out
+        if (lk := s.get("link")) is not None:      # { column, param }: clicking a cell picks that value
+            if not (isinstance(lk, dict) and lk.get("column") in cols and lk.get("param") in getattr(nb, "params", {})):
+                out.update(diag(BlockError("BAD_SPEC", "link must be { column: <shown column>, param: <declared param> }")))
+                return out
+            out["link"] = {"column": lk["column"], "param": lk["param"],
+                           "values": [to_json(row[names.index(lk["column"])]) for row in rows[:int(s.get("limit", ROW_CAP))]]}
         limit = int(s.get("limit", ROW_CAP))
         fmts = s.get("format") or {}
         idx = [names.index(c) for c in cols]

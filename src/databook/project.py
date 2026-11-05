@@ -38,6 +38,7 @@ class NotebookRef:
     results_path: Path
     history_dir: Path
     work_dir: Path                 # recalculated sheet-model copies
+    params_path: Path              # picked parameter values (viewer picker / `databook param`)
 
 
 def schema_for(key: str) -> str:
@@ -87,7 +88,24 @@ class Project:
         if key not in nbs:
             raise ProjectError(f"no notebook {key!r}; notebooks: {', '.join(nbs) or 'none'}")
         return NotebookRef(key, nbs[key], schema_for(key), self.dir / "results" / f"{key}.json",
-                           self.dir / "history" / key, self.dir / "models" / schema_for(key))
+                           self.dir / "history" / key, self.dir / "models" / schema_for(key),
+                           self.dir / "params" / f"{key}.json")
+
+    def params(self, key: str) -> dict:
+        """Picked parameter values of a notebook: {name: value}; {} when none picked or unreadable."""
+        f = self.nb(key).params_path
+        try:
+            v = json.loads(f.read_text()) if f.exists() else {}
+        except json.JSONDecodeError:
+            return {}
+        return v if isinstance(v, dict) else {}
+
+    def save_params(self, key: str, values: dict) -> None:
+        f = self.nb(key).params_path
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(".tmp")
+        tmp.write_text(json.dumps(values, default=str))
+        tmp.replace(f)
 
     @property
     def notebook(self) -> Path:            # single-notebook convenience

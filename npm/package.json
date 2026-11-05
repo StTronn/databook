@@ -1,6 +1,6 @@
 {
   "name": "databook-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Agent-native data notebook: your coding agent answers data questions in SQL/Python notebooks where every number traces to the block that computed it.",
   "keywords": ["data", "notebook", "duckdb", "sql", "agent", "claude-code", "codex", "opencode", "pi"],
   "homepage": "https://github.com/StTronn/databook",

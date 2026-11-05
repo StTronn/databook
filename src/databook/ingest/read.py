@@ -20,7 +20,7 @@ class RawTable:
     headers: list[str]           # normalized snake_case, unique
     original: list[str]          # header text as found
     rows: list[list]             # python values (str/int/float/bool/datetime/None)
-    entity: str | None = None    # Razorpay-style JSON `entity` of items, if any
+    entity: str | None = None    # JSON items' `entity` (Razorpay) or "object:<object>" (Stripe), if uniform
     minor_units: bool = False    # True for API/CLI JSON (amounts in paise)
     table: str | None = None     # source table name (SQLite) → DuckDB table name
     warnings: list[str] = field(default_factory=list)
@@ -124,24 +124,40 @@ def _read_xlsx(path: Path, label: str) -> list[RawTable]:
 
 
 def _read_csv(path: Path, label: str) -> list[RawTable]:
-    text = path.read_text(encoding="utf-8-sig")
+    raw = path.read_bytes()   # Google Ads "Excel CSV" is UTF-16 (BOM) TSV
+    text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8-sig")
     try:
         dialect = csv.Sniffer().sniff(text[:65536], delimiters=",\t;|")
-    except csv.Error:
-        dialect = csv.excel_tab if path.suffix.lower() == ".tsv" else csv.excel
+    except csv.Error:   # e.g. report-title preamble lines: take the delimiter densest on any early line
+        lines = text.splitlines()[:20]
+        best = max(",\t;|", key=lambda d: max((ln.count(d) for ln in lines), default=0))
+        dialect = csv.excel_tab if path.suffix.lower() == ".tsv" or best == "\t" else csv.excel
+        if best in ";|":
+            class dialect(csv.excel):   # noqa: N801
+                delimiter = best
     grid = [[None if c == "" else c for c in r] for r in csv.reader(io.StringIO(text), dialect)]
     t = _locate(grid, label)
     return [t] if t else []
 
 
+def _page(d, top: bool) -> list:
+    """API list envelopes → their items; else [d]. Razorpay {entity: collection, items}, Stripe {object: list, data},
+    Meta Graph {data, paging}. Inside a list only real envelopes unwrap: GA4 event rows carry their own `items`."""
+    if isinstance(d, dict):
+        for k in ("items", "data"):
+            if isinstance(d.get(k), list) and (top or d.get("entity") == "collection" or d.get("object") == "list"
+                                               or set(d) <= {k, "paging", "summary", "count", "has_more", "url"}):
+                return d[k]
+    return [d]
+
+
 def _read_json(path: Path, label: str) -> list[RawTable]:
-    doc = json.loads(path.read_text(encoding="utf-8-sig"))
-    if isinstance(doc, dict) and isinstance(doc.get("items"), list):
-        items = doc["items"]
-    elif isinstance(doc, list):
-        items = [i for d in doc for i in (d["items"] if isinstance(d, dict) and "items" in d else [d])]
-    else:
-        items = [doc]
+    text = path.read_text(encoding="utf-8-sig")
+    try:
+        doc = json.loads(text)
+    except json.JSONDecodeError:   # NDJSON (`bq extract`, .jsonl): one object per line
+        doc = [json.loads(ln) for ln in text.splitlines() if ln.strip()]
+    items = [i for d in doc for i in _page(d, False)] if isinstance(doc, list) else _page(doc, True)
     if not items:
         return []
     if not all(isinstance(i, dict) for i in items):
@@ -149,7 +165,7 @@ def _read_json(path: Path, label: str) -> list[RawTable]:
     keys: dict[str, None] = {}
     for i in items:
         keys.update(dict.fromkeys(i))
-    entities = {i.get("entity") for i in items}
+    entities = {i.get("entity") or (f"object:{i['object']}" if isinstance(i.get("object"), str) else None) for i in items}
     t = RawTable(label, [snake(k) for k in keys], list(keys), [], minor_units=True,
                  entity=entities.pop() if len(entities) == 1 else None)
     for i in items:
@@ -199,9 +215,9 @@ def read_file(path: Path, label: str) -> list[RawTable]:
         return _read_xlsx(path, label)
     if ext in (".csv", ".tsv", ".txt"):
         return _read_csv(path, label)
-    if ext == ".json":
+    if ext in (".json", ".jsonl", ".ndjson"):
         return _read_json(path, label)
     if ext in (".sqlite", ".sqlite3", ".db"):
         return _read_sqlite(path, label)
     raise ValueError(f"{label}: unsupported file type {ext!r} "
-                     "(supported: .xlsx .xlsm .csv .tsv .json .parquet .sqlite .db)")
+                     "(supported: .xlsx .xlsm .csv .tsv .json .jsonl .ndjson .parquet .sqlite .db)")

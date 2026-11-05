@@ -3,6 +3,7 @@ import type { KeyboardEvent, MouseEvent } from "react"
 import { BlockError } from "@/components/notebook/block-error"
 import { ItemView } from "@/components/notebook/block-view"
 import { useNotebook } from "@/components/notebook/notebook-context"
+import { ParamBar } from "@/components/notebook/param-bar"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { isVisible, plural, type Section } from "@/lib/notebook"
@@ -60,6 +61,7 @@ export function Notebook() {
   if (!sections.length) return <p className="text-muted-foreground">This notebook has no blocks.</p>
   return (
     <div className="flex flex-col gap-8" onClick={onClick} onKeyDown={onKeyDown}>
+      <ParamBar />
       {sections.map((s) => (
         <SectionView key={s.key} section={s} />
       ))}

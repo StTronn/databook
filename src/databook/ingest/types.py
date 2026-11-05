@@ -17,7 +17,8 @@ _PLAIN = re.compile(r"^-?\d+(\.\d+)?$")
 _WEST = re.compile(r"^-?\d{1,3}(,\d{3})+(\.\d+)?$")           # 1,234,567.89
 _INDIAN = re.compile(r"^-?\d{1,2}(,\d{2})*,\d{3}(\.\d+)?$")   # 12,34,567.89
 _EURO = re.compile(r"^-?\d{1,3}(\.\d{3})+,\d+$")              # 1.234,56  (ambiguous → never parsed)
-_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$")
+_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?(?: ?(?:Z|[+-]\d{2}:?\d{2}))?$")
+_OFFSET = re.compile(r" ?([+-]\d{2}):?(\d{2})$")                # Shopify "2024-01-15 10:23:45 -0500"
 _SLASH = re.compile(r"^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$")
 _CURRENCY = "₹$€£"
 EXCEL_EPOCH = datetime(1899, 12, 30)
@@ -145,7 +146,10 @@ def _parse_dt(v, order: str | None) -> tuple[datetime, bool]:
         return datetime(v.year, v.month, v.day), False
     s = str(v).strip()
     if _ISO.match(s):
-        return datetime.fromisoformat(s.replace("Z", "+00:00")), len(s) > 10
+        s = s.replace(" Z", "Z").replace("Z", "+00:00")
+        if len(s) > 10:
+            s = _OFFSET.sub(r"\1:\2", s)
+        return datetime.fromisoformat(s), len(s) > 10
     m = _SLASH.match(s)
     if m and order:
         a, b, y = int(m[1]), int(m[2]), int(m[3])
@@ -175,6 +179,25 @@ def conv_unix(v, ctx):
     return datetime.fromtimestamp(int(conv_int(v, ctx)), timezone.utc).isoformat(sep=" ")
 
 
+def conv_unix_us(v, ctx):
+    """GA4 BigQuery export: microseconds since epoch (exact; no float)."""
+    us = int(conv_int(v, ctx))
+    return (datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(microseconds=us)).isoformat(sep=" ")
+
+
+def conv_utc(v, ctx):
+    """Naive values are UTC (Stripe "Created date (UTC)"); values with an offset keep it."""
+    dt, _ = _parse_dt(v, None)
+    return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).isoformat(sep=" ")
+
+
+def conv_yyyymmdd(v, ctx):
+    s = conv_text(v, ctx).strip()
+    if not re.fullmatch(r"\d{8}", s):
+        raise ValueError(f"not a YYYYMMDD date: {v!r}")
+    return date(int(s[:4]), int(s[4:6]), int(s[6:])).isoformat()
+
+
 def conv_json(v, ctx):
     if isinstance(v, (dict, list)):
         return json.dumps(v)
@@ -192,7 +215,11 @@ NAMED = {
     "date:dmy": ("TIMESTAMP", make_timestamp("dmy")),
     "date:mdy": ("TIMESTAMP", make_timestamp("mdy")),
     "local:dmy": ("TIMESTAMPTZ", make_timestamp("dmy", local_tz=True)),
+    "local": ("TIMESTAMPTZ", make_timestamp(None, local_tz=True)),
+    "utc": ("TIMESTAMPTZ", conv_utc),
     "unix": ("TIMESTAMPTZ", conv_unix),
+    "unix_us": ("TIMESTAMPTZ", conv_unix_us),
+    "yyyymmdd": ("DATE", conv_yyyymmdd),
 }
 
 

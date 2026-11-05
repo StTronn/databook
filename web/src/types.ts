@@ -24,6 +24,7 @@ export type KpiItem = { label: string; value: string; ref?: string; compareRef?:
 export type KpiBlock = Base & { kind: "kpi"; items: KpiItem[] }
 export type TableBlock = Base & {
   kind: "table"; data: string; columns: string[]; display: string[][]; numeric: boolean[]; rowCount: number; truncated: boolean
+  link?: { column: string; param: string; values: unknown[] } // clicking a cell of `column` picks values[row] for `param`
 }
 // combo series carry `mark`; band marks carry values (low) + values2 (high); display = Python-formatted text per row
 export type Series = { name: string; mark?: "bar" | "line" | "dot" | "area" | "band"; values: (number | null)[]; values2?: (number | null)[]; display: string[] }
@@ -45,6 +46,8 @@ export type ChartBlock = Base & {
   zero?: boolean // false = y axis fits the data instead of starting at 0 (line/combo)
 }
 export type Block = MdBlock | ComputeBlock | KpiBlock | TableBlock | ChartBlock
+// Notebook parameter (frontmatter `params:`): options are [value, label] from the `from` block; value = the one used
+export type Param = { name: string; label: string; value: unknown; display: string; options: [unknown, string][]; truncated: boolean }
 export type Doc = {
   notebook: string // key, e.g. "growth/cohorts"
   path: string // file relative to the workspace, e.g. "notebooks/growth/cohorts.md" (use in copy-ref)
@@ -53,6 +56,7 @@ export type Doc = {
   ranAt: string
   timezone: string
   ok: boolean
+  params?: Param[]
   blocks: Block[]
   diagnostics: Diagnostic[]
 }

@@ -44,7 +44,10 @@ export function NotebookProvider({ doc, view, children }: { doc: Doc; view: View
     setCollapsed(new Set())
   }
 
-  const sections = useMemo(() => buildSections(doc.blocks), [doc.blocks])
+  // A `# Title` heading that repeats the page title shows as "Overview" (the header already shows the title).
+  const sections = useMemo(() => buildSections(doc.blocks).map((sec) =>
+    sec.heading?.level === 1 && sec.heading.text.trim().toLowerCase() === doc.title.trim().toLowerCase()
+      ? { ...sec, heading: { ...sec.heading, html: "Overview", text: "Overview" } } : sec), [doc.blocks, doc.title])
   const byId = useMemo(() => new Map(doc.blocks.map((b) => [b.id, b])), [doc.blocks])
   const sectionOf = useMemo(() => {
     const m = new Map<string, string>()

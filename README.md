@@ -53,7 +53,7 @@ A monthly business review (4 Spider2-lite questions + 3 of ours) and seller-chan
 ## Repository layout
 | Path | What |
 |---|---|
-| `src/databook/` | CLI, runtime (import, blocks, `check`), source packs (e.g. Razorpay), agent skill, built viewer |
+| `src/databook/` | CLI, runtime (import, blocks, `check`), source packs (Razorpay, Shopify, Stripe, GA4, Meta/Google Ads), agent skill, built viewer |
 | `playbooks/` | Claude Code skills with data-analysis know-how, independent of Databook (`data-analysis`) |
 | `web/` | viewer source (React + Vite); `npm run build` writes `src/databook/viewer/` |
 | `tests/` | `uv run pytest` |

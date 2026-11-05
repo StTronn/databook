@@ -22,6 +22,8 @@ If `databook` is not on PATH: `npm i -g databook-cli` (or prefix each command wi
 2. `databook import data/<files>` — read every warning/error line. `✗ AMBIGUOUS_DATE` / `TYPE_MISMATCH` mean
    nothing was loaded for that table: rerun with `--types col=date:dmy` (or the type it names). When a line
    says a source pack matched (e.g. `razorpay.payments`), run `databook skill guide <pack>` once and follow it.
+   Packs: razorpay, shopify, stripe, ga4 (BigQuery export), meta_ads, google_ads — when the user wants one of these
+   but has no file yet, the guide says how to export it (dashboard export or the vendor's CLI).
 3. `databook schema` — learn tables, columns, types. `databook query "<sql>"` to explore (read-only).
    Databases need no import: `databook source add shop --type postgres --env SHOP_URL` (mysql/sqlite/duckdb too;
    the URL stays in the env var), then SQL blocks read `shop.<schema>.<table>` read-only. Filter and aggregate in
@@ -34,6 +36,17 @@ If `databook` is not on PATH: `npm i -g databook-cli` (or prefix each command wi
    After edits, `databook diff` lists per-block changes vs the previous run — tell the user which numbers moved.
 
 Never claim the report is done until `databook check` prints `✓ … 0 error(s)`.
+
+## Viewer requests (Agent panel in `databook dev`)
+
+When the user asks you to listen for viewer requests: run `databook inbox --wait` in the background (Claude Code:
+background Bash; it exits when a request arrives). Its output is the request: a question → answer WITHOUT editing; a
+change → edit the notebook, run `databook check` until ✓. Report with `databook reply <id> --step "…"`, finish with
+`databook reply <id> --done --text "…"` (cite blocks as @id), then start `databook inbox --wait` again in the
+background. If `reply` says the request was stopped, drop it and listen again.
+Codex: never run `inbox --wait` (it blocks the turn). Instead run `databook inbox --beat --agent codex --session
+"$CODEX_THREAD_ID"` once (again after ~30 min idle); requests then arrive as messages starting `[databook] Request <id>`.
+pi: the databook extension (installed by `databook setup`) delivers requests as messages; never run `databook inbox`.
 
 ## Notebook shape
 
@@ -78,6 +91,10 @@ show: Model!A1:B7
 ```
 Prose: Paid conversion was **{{funnel.conv | pct}}**.   ← formats: int num pct inr inr_short usd usd_short gbp gbp_short date text
 ````
+
+Pickers (one customer, one region…): frontmatter `params: { customer: { from: customer_list.customer_id, show:
+customer_list.label, default: 16029, label: Customer } }`; SQL reads `$customer`, python `params["customer"]`; a table
+with `link: { column: customer_id, param: customer }` picks on click. `databook param customer=123` picks from the CLI.
 
 ## Rules that keep numbers correct
 

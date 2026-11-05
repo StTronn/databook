@@ -1,0 +1,6 @@
+Campaign performance report
+"January 15, 2024 - January 16, 2024"
+Day,Campaign,Campaign ID,Currency code,Cost,Impr.,Clicks,Conversions,Conv. value,Conv. rate
+2024-01-15,Brand - Search,20123456789,USD,"1,204.50","12,034",410,12.50,"1,016.25",3.05%
+2024-01-16,Brand - Search,20123456789,USD,98.10,1500,0,0.00,0.00,--
+Total: Account,,,USD,"1,302.60","13,534",410,12.50,"1,016.25",3.03%

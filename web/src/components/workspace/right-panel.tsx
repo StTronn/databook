@@ -1,6 +1,8 @@
 import { SearchIcon } from "lucide-react"
 import { useDeferredValue, useState, type ReactNode } from "react"
+import { AgentPanel } from "@/components/agent/agent-panel"
 import { useNotebook } from "@/components/notebook/notebook-context"
+import { useAgentMaybe } from "@/hooks/use-agent"
 import { KindBadge, StatusBadge } from "@/components/notebook/status-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { blockLabel, isCompute, plural } from "@/lib/notebook"
 import type { Settings } from "@/types"
 
-export type PanelTab = "outputs" | "settings"
+export type PanelTab = "agent" | "outputs" | "settings"
 
 const label = "tb-label text-muted-foreground"
 
@@ -109,10 +111,16 @@ type Props = { tab: PanelTab; onTab: (t: PanelTab) => void; hasDoc: boolean; set
 
 /** Right panel: OUTPUTS (current notebook's compute blocks) | SETTINGS (workspace, dev only). */
 export function RightPanel({ tab, onTab, hasDoc, settings }: Props) {
-  const value = settings ? tab : "outputs"
+  const agent = !!useAgentMaybe() && hasDoc
+  const value = (tab === "settings" && !settings) || (tab === "agent" && !agent) ? "outputs" : tab
   return (
     <Tabs value={value} onValueChange={(v) => onTab(v as PanelTab)} className="h-full min-h-0 gap-0">
       <TabsList variant="line" className="h-10 w-full shrink-0 justify-start rounded-none border-b px-2">
+        {agent ? (
+          <TabsTrigger value="agent" className="tb-label flex-none">
+            Agent
+          </TabsTrigger>
+        ) : null}
         <TabsTrigger value="outputs" className="tb-label flex-none">
           Outputs
         </TabsTrigger>
@@ -122,6 +130,11 @@ export function RightPanel({ tab, onTab, hasDoc, settings }: Props) {
           </TabsTrigger>
         ) : null}
       </TabsList>
+      {agent ? (
+        <TabsContent value="agent" className="min-h-0">
+          <AgentPanel />
+        </TabsContent>
+      ) : null}
       <TabsContent value="outputs" className="min-h-0 overflow-y-auto">
         {hasDoc ? <Outputs /> : <p className="px-3 py-4 text-xs text-muted-foreground">Open a notebook to see its outputs.</p>}
       </TabsContent>

@@ -14,10 +14,13 @@ type Props = {
   /** column to emphasise (trace of `block.col`) */
   highlight?: string
   limit?: number
+  /** index of a column whose cells are links; onLink(row index) on click */
+  linkCol?: number
+  onLink?: (row: number) => void
 }
 
 /** Formatted result rows: first `limit`, with a show-all toggle; notes when the runner capped the rows. */
-export function ResultTable({ columns, rows, numeric, rowCount, truncated, highlight, limit = 10 }: Props) {
+export function ResultTable({ columns, rows, numeric, rowCount, truncated, highlight, limit = 10, linkCol = -1, onLink }: Props) {
   const [all, setAll] = useState(false)
   const shown = all ? rows : rows.slice(0, limit)
   const hi = highlight ? columns.indexOf(highlight) : -1
@@ -39,7 +42,9 @@ export function ResultTable({ columns, rows, numeric, rowCount, truncated, highl
             <TableRow key={ri}>
               {r.map((v, i) => (
                 <TableCell key={i} className={cn("py-1.5", cls(i))}>
-                  {v}
+                  {i === linkCol && onLink ? (
+                    <button type="button" className="text-primary underline-offset-2 hover:underline" onClick={() => onLink(ri)}>{v}</button>
+                  ) : v}
                 </TableCell>
               ))}
             </TableRow>

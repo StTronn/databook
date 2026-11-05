@@ -130,6 +130,30 @@ def _ref_names(b: Block) -> list[str]:
     return []
 
 
+def sql_params(sql: str) -> list[tuple[int, int, str]]:
+    """(start, end, name) of every `$name` in SQL outside strings and comments (DuckDB's tokenizer: `$` operator
+    immediately followed by an identifier; `$1` / `$$…$$` are not params)."""
+    try:
+        toks = duckdb.tokenize(sql)
+    except Exception:
+        return []
+    out = []
+    for (pos, typ), (nxt, ntyp) in zip(toks, toks[1:]):
+        if typ == duckdb.token_type.operator and sql[pos:nxt].rstrip().endswith("$") and \
+                ntyp == duckdb.token_type.identifier and sql[nxt - 1] == "$":
+            m = re.match(r"[A-Za-z_][A-Za-z0-9_]*", sql[nxt:])
+            if m:
+                out.append((nxt - 1, nxt + m.end(), m[0]))
+    return out
+
+
+def bind_params(sql: str) -> str:
+    """`$name` → getvariable('name') (values are set per run with SET VARIABLE, typed like their options)."""
+    for start, end, name in reversed(sql_params(sql)):
+        sql = f"{sql[:start]}getvariable('{name}'){sql[end:]}"
+    return sql
+
+
 def name_parts(name: str) -> list[str]:
     """`shop.sales."My T"` → ['shop', 'sales', 'My T'] (dots inside quotes are part of the name)."""
     return [p.strip('"') for p in re.findall(r'"(?:[^"]|"")*"|[^.]+', name)]
@@ -151,8 +175,9 @@ def resolve(nb: Notebook, tables: set[str], sources: frozenset[str] = frozenset(
             nb.diags.append(Diag(b.line, "DUPLICATE_ID", f"block id {b.id!r} shadows an imported table", block=b.id))
         if b.kind == "sql":
             try:
-                names = list(duckdb.get_table_names(b.body))
-                qualified = [name_parts(q.split(" AS ")[0]) for q in duckdb.get_table_names(b.body, qualified=True)]
+                sql = bind_params(b.body)
+                names = list(duckdb.get_table_names(sql))
+                qualified = [name_parts(q.split(" AS ")[0]) for q in duckdb.get_table_names(sql, qualified=True)]
             except Exception as e:
                 nb.diags.append(Diag(b.line, "SQL_ERROR", str(e).split("\n")[0], block=b.id))
                 continue
